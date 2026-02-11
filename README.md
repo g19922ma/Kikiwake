@@ -1,1 +1,2 @@
 # Kikiwake
+Geminiで開発するときにはgemini.mdを読んでから作業をするように。
