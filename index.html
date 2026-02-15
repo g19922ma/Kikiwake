@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kikiwake - 音声識別課題</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- SCREEN: Welcome & Metadata -->
+        <div id="screen-welcome" class="screen active">
+            <h1>Kikiwake 音声識別課題</h1>
+            <p>実験へようこそ。まず、参加者情報を入力してください。</p>
+            <div class="form-group">
+                <label for="participant-id">参加者ID:</label>
+                <input type="text" id="participant-id" placeholder="IDを入力">
+            </div>
+            <div class="form-group">
+                <label for="input-device">入力デバイス:</label>
+                <select id="input-device">
+                    <option value="mouse">マウス</option>
+                    <option value="keyboard">キーボード (スペースキー)</option>
+                    <option value="touch">タッチ</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <input type="checkbox" id="test-mode-toggle">
+                <label for="test-mode-toggle">テストモード（短時間で試す）</label>
+            </div>
+            <button id="btn-start-motor">運動反応の計測へ</button>
+        </div>
+
+        <!-- SCREEN: Motor Calibration -->
+        <div id="screen-motor" class="screen">
+            <h2>運動反応の計測</h2>
+            <p>ビープ音が聞こえたら、できるだけ速く下のエリアを押してください。</p>
+            <p>試行: <span id="motor-counter">0</span> / <span id="motor-total-trials">--</span></p>
+            <div id="motor-area-container">
+                <button id="btn-start-calibration">計測を開始</button>
+                <div id="motor-area" style="display: none;">
+                    <p>ここにタッチ or クリック or スペースキー</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: Main Task Instruction -->
+        <div id="screen-main-intro" class="screen">
+            <h2>本課題の説明</h2>
+            <p>これから本課題を開始します。</p>
+            <p>1. 合図音に続いて、課題の音声が再生されます。<br>
+               2. <strong>「何の音かわかった」と判断した瞬間</strong>に、できるだけ速くボタンを押してください。<br>
+               3. 音声が停止した後、聞こえた音のカテゴリを選択してください。</p>
+            <button id="btn-start-main">本課題を開始</button>
+        </div>
+
+        <!-- SCREEN: Trial (Play & Press) -->
+        <div id="screen-trial" class="screen">
+            <h2>音を聴いています...</h2>
+            <p>試行: <span id="trial-counter">0</span> / <span id="total-trials">--</span></p>
+            <div id="press-button">わかった瞬間に押す (スペース / クリック)</div>
+        </div>
+
+        <!-- SCREEN: Choice -->
+        <div id="screen-choice" class="screen">
+            <h2>カテゴリを選択</h2>
+            <div id="choice-container">
+                <div id="choice-step-1-initials" class="choice-step active">
+                    <!-- First-letter (initial) buttons will be injected here -->
+                </div>
+                <div id="choice-step-2-candidates" class="choice-step">
+                    <!-- Candidate buttons will be injected here -->
+                </div>
+            </div>
+                <div id="choice-controls" class="choice-controls">
+                    <button id="btn-back-to-initials" style="display: none;">頭文字の選択に戻る</button>
+                    <button id="btn-confirm-choice" disabled>選択を確定</button>
+                </div>        </div>
+
+        <!-- SCREEN: Break -->
+        <div id="screen-break" class="screen">
+            <h2>休憩</h2>
+            <p>しばらく休憩してください。</p>
+            <p>準備ができたら、下のボタンを押して実験を再開してください。</p>
+            <button id="btn-resume">実験を再開する</button>
+        </div>
+
+        <!-- SCREEN: Results -->
+        <div id="screen-results" class="screen">
+            <h2>実験終了</h2>
+            <p>ご協力ありがとうございました。</p>
+            <button id="btn-download-logs">ログをダウンロード (CSV)</button>
+            <p id="save-status"></p>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs (Placeholder) -->
+    <!-- <script type="module" src="firebase-config.js"></script> -->
+    <script src="script.js?v=2026021501" type="module"></script>
+</body>

@@ -1,0 +1,402 @@
+[
+  {
+    "id": 1,
+    "kimariji": "あきの"
+  },
+  {
+    "id": 2,
+    "kimariji": "はるす"
+  },
+  {
+    "id": 3,
+    "kimariji": "あし"
+  },
+  {
+    "id": 4,
+    "kimariji": "たご"
+  },
+  {
+    "id": 5,
+    "kimariji": "おく"
+  },
+  {
+    "id": 6,
+    "kimariji": "かさ"
+  },
+  {
+    "id": 7,
+    "kimariji": "あまの"
+  },
+  {
+    "id": 8,
+    "kimariji": "わがゐ"
+  },
+  {
+    "id": 9,
+    "kimariji": "はなの"
+  },
+  {
+    "id": 10,
+    "kimariji": "これ"
+  },
+  {
+    "id": 11,
+    "kimariji": "わたのはらや"
+  },
+  {
+    "id": 12,
+    "kimariji": "あまつ"
+  },
+  {
+    "id": 13,
+    "kimariji": "つく"
+  },
+  {
+    "id": 14,
+    "kimariji": "みち"
+  },
+  {
+    "id": 15,
+    "kimariji": "きみがためは"
+  },
+  {
+    "id": 16,
+    "kimariji": "たち"
+  },
+  {
+    "id": 17,
+    "kimariji": "ちは"
+  },
+  {
+    "id": 18,
+    "kimariji": "す"
+  },
+  {
+    "id": 19,
+    "kimariji": "なにわが"
+  },
+  {
+    "id": 20,
+    "kimariji": "わび"
+  },
+  {
+    "id": 21,
+    "kimariji": "いまこ"
+  },
+  {
+    "id": 22,
+    "kimariji": "ふ"
+  },
+  {
+    "id": 23,
+    "kimariji": "つき"
+  },
+  {
+    "id": 24,
+    "kimariji": "この"
+  },
+  {
+    "id": 25,
+    "kimariji": "なにし"
+  },
+  {
+    "id": 26,
+    "kimariji": "おぐ"
+  },
+  {
+    "id": 27,
+    "kimariji": "みかの"
+  },
+  {
+    "id": 28,
+    "kimariji": "やまざ"
+  },
+  {
+    "id": 29,
+    "kimariji": "こころあ"
+  },
+  {
+    "id": 30,
+    "kimariji": "ありあ"
+  },
+  {
+    "id": 31,
+    "kimariji": "あさぼらけあ"
+  },
+  {
+    "id": 32,
+    "kimariji": "やまが"
+  },
+  {
+    "id": 33,
+    "kimariji": "ひさ"
+  },
+  {
+    "id": 34,
+    "kimariji": "たれ"
+  },
+  {
+    "id": 35,
+    "kimariji": "ひとは"
+  },
+  {
+    "id": 36,
+    "kimariji": "なつ"
+  },
+  {
+    "id": 37,
+    "kimariji": "しら"
+  },
+  {
+    "id": 38,
+    "kimariji": "わすら"
+  },
+  {
+    "id": 39,
+    "kimariji": "あさじ"
+  },
+  {
+    "id": 40,
+    "kimariji": "しの"
+  },
+  {
+    "id": 41,
+    "kimariji": "こい"
+  },
+  {
+    "id": 42,
+    "kimariji": "ちぎりき"
+  },
+  {
+    "id": 43,
+    "kimariji": "あい"
+  },
+  {
+    "id": 44,
+    "kimariji": "おおこ"
+  },
+  {
+    "id": 45,
+    "kimariji": "あはれ"
+  },
+  {
+    "id": 46,
+    "kimariji": "ゆら"
+  },
+  {
+    "id": 47,
+    "kimariji": "やえ"
+  },
+  {
+    "id": 48,
+    "kimariji": "かぜを"
+  },
+  {
+    "id": 49,
+    "kimariji": "みかき"
+  },
+  {
+    "id": 50,
+    "kimariji": "きみがためお"
+  },
+  {
+    "id": 51,
+    "kimariji": "かく"
+  },
+  {
+    "id": 52,
+    "kimariji": "あけ"
+  },
+  {
+    "id": 53,
+    "kimariji": "なげき"
+  },
+  {
+    "id": 54,
+    "kimariji": "わすれ"
+  },
+  {
+    "id": 55,
+    "kimariji": "たき"
+  },
+  {
+    "id": 56,
+    "kimariji": "あらざ"
+  },
+  {
+    "id": 57,
+    "kimariji": "め"
+  },
+  {
+    "id": 58,
+    "kimariji": "ありま"
+  },
+  {
+    "id": 59,
+    "kimariji": "やす"
+  },
+  {
+    "id": 60,
+    "kimariji": "おおえ"
+  },
+  {
+    "id": 61,
+    "kimariji": "いに"
+  },
+  {
+    "id": 62,
+    "kimariji": "よを"
+  },
+  {
+    "id": 63,
+    "kimariji": "いまは"
+  },
+  {
+    "id": 64,
+    "kimariji": "あさぼらけう"
+  },
+  {
+    "id": 65,
+    "kimariji": "うら"
+  },
+  {
+    "id": 66,
+    "kimariji": "もろ"
+  },
+  {
+    "id": 67,
+    "kimariji": "はるの"
+  },
+  {
+    "id": 68,
+    "kimariji": "こころに"
+  },
+  {
+    "id": 69,
+    "kimariji": "あらし"
+  },
+  {
+    "id": 70,
+    "kimariji": "さ"
+  },
+  {
+    "id": 71,
+    "kimariji": "ゆう"
+  },
+  {
+    "id": 72,
+    "kimariji": "おと"
+  },
+  {
+    "id": 73,
+    "kimariji": "たか"
+  },
+  {
+    "id": 74,
+    "kimariji": "うか"
+  },
+  {
+    "id": 75,
+    "kimariji": "ちぎりお"
+  },
+  {
+    "id": 76,
+    "kimariji": "わたのはらこ"
+  },
+  {
+    "id": 77,
+    "kimariji": "せ"
+  },
+  {
+    "id": 78,
+    "kimariji": "あはじ"
+  },
+  {
+    "id": 79,
+    "kimariji": "あきか"
+  },
+  {
+    "id": 80,
+    "kimariji": "ながか"
+  },
+  {
+    "id": 81,
+    "kimariji": "ほ"
+  },
+  {
+    "id": 82,
+    "kimariji": "おも"
+  },
+  {
+    "id": 83,
+    "kimariji": "よのなかよ"
+  },
+  {
+    "id": 84,
+    "kimariji": "ながら"
+  },
+  {
+    "id": 85,
+    "kimariji": "よも"
+  },
+  {
+    "id": 86,
+    "kimariji": "なげけ"
+  },
+  {
+    "id": 87,
+    "kimariji": "む"
+  },
+  {
+    "id": 88,
+    "kimariji": "なにわえ"
+  },
+  {
+    "id": 89,
+    "kimariji": "たま"
+  },
+  {
+    "id": 90,
+    "kimariji": "みせ"
+  },
+  {
+    "id": 91,
+    "kimariji": "きり"
+  },
+  {
+    "id": 92,
+    "kimariji": "わがそ"
+  },
+  {
+    "id": 93,
+    "kimariji": "よのなかは"
+  },
+  {
+    "id": 94,
+    "kimariji": "みよ"
+  },
+  {
+    "id": 95,
+    "kimariji": "おおけ"
+  },
+  {
+    "id": 96,
+    "kimariji": "はなさ"
+  },
+  {
+    "id": 97,
+    "kimariji": "こぬ"
+  },
+  {
+    "id": 98,
+    "kimariji": "かぜそ"
+  },
+  {
+    "id": 99,
+    "kimariji": "ひとも"
+  },
+  {
+    "id": 100,
+    "kimariji": "もも"
+  }
+]
