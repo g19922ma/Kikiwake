@@ -1,6 +1,6 @@
 html, body {
     height: 100%;
-    overflow: hidden; /* Prevent scrolling on the body */
+    overflow: hidden;
     margin: 0;
 }
 
@@ -9,7 +9,8 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: #f4f4f4;
+    background-color: #ffffff;
+    color: #111111;
 }
 
 #app {
@@ -19,150 +20,58 @@ body {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 0 15px rgba(0,0,0,0.1);
-    display: flex; /* Use flexbox to center the active screen */
+    display: flex;
     align-items: center;
     justify-content: center;
     min-height: 80vh;
 }
 
-.screen {
-    display: none;
-}
-.screen.active {
-    display: block;
-    animation: fadeIn 0.5s;
-}
+.screen { display: none; }
+.screen.active { display: block; animation: fadeIn 0.5s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* --- Gojuon Grid Styles for Step 1 --- */
+/* --- Gojuon Grid Styles --- */
 .choice-step.gojuon-grid {
     display: grid;
-    grid-template-columns: repeat(10, 1fr); /* 10 columns for vertical Gojuon */
+    grid-template-columns: repeat(10, 1fr);
     gap: 5px;
     padding: 10px;
     border: 1px solid #ccc;
     border-radius: 5px;
 }
-
 .gojuon-grid .initial-btn {
     width: 100%;
-    aspect-ratio: 1 / 1; /* Make buttons square */
+    aspect-ratio: 1 / 1;
     font-size: 1.1em;
+    background-color: #ffffff;
+    color: #111111;
+    border: 2px solid #444444;
+    font-weight: 600;
 }
-
 .gojuon-grid .initial-btn:not(.placeholder):not([disabled]) {
-    font-weight: bold;
-    color: #0056b3; /* Make active buttons stand out */
+    color: #003a80;
 }
-
+.gojuon-grid .initial-btn:hover {
+    background-color: #e6f2ff;
+    border-color: #005fcc;
+}
 .gojuon-grid .initial-btn.disabled {
-    background-color: #f8f8f8;
-    color: #ddd; /* Lighter color for disabled buttons */
-    cursor: not-allowed;
-    border-color: #eee;
-}
-.gojuon-grid .placeholder {
-    visibility: hidden;
-}
-
-/* --- Radial Menu Styles for Step 2 (Overlay) --- */
-.choice-step.radial-menu-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.2); /* Semi-transparent backdrop */
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.radial-menu {
-    position: relative;
-    width: 400px;
-    height: 400px;
-}
-
-.radial-menu .candidate-btn {
-    position: absolute;
-    margin: 0;
-    width: auto;
-    max-width: 140px;
-    height: 70px;
-    padding: 0 15px;
-    border-radius: 35px;
-    font-size: 1.1em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: transform 0.1s ease-out, background-color 0.1s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-.radial-menu .candidate-btn:hover {
-    background-color: #ddd;
-}
-
-.center-text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 2em;
-    color: #555;
-    background-color: rgba(255, 255, 255, 0.8);
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none; /* Allow clicks to pass through */
-}
-
-/* General button and form styles */
-.choice-btn {
-    padding: 10px 15px;
-    font-size: 1em;
-    cursor: pointer;
-    border: 1px solid #ccc;
-    background-color: #f9f9f9;
-    border-radius: 5px;
-    transition: background-color 0.2s;
-}
-.choice-btn:hover:not(:disabled) {
-    background-color: #e0e0e0;
-}
-.choice-btn.selected {
-    background-color: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-.choice-btn:disabled {
-    opacity: 0.5;
+    background-color: #eeeeee;
+    color: #aaaaaa;
+    border-color: #dddddd;
     cursor: not-allowed;
 }
+.gojuon-grid .placeholder { visibility: hidden; }
 
-.form-group {
-    margin-bottom: 15px;
-}
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-}
+/* --- General button and form styles --- */
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; }
 .form-group input[type="text"], .form-group select {
     width: 100%;
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
 }
-
 button {
     padding: 10px 20px;
     font-size: 1em;
@@ -172,30 +81,7 @@ button {
     border: none;
     border-radius: 5px;
 }
-button:disabled {
-    background-color: #ccc;
-}
-
-.choice-controls {
-    margin-top: 20px;
-    text-align: center;
-}
-.choice-step {
-    display: none;
-}
-.choice-step.active {
-    display: block; /* Default display */
-}
-
-/* Special case for grid */
-.choice-step.active.gojuon-grid {
-    display: grid;
-}
-
-/* Special case for radial menu */
-.choice-step.active.radial-menu {
-    display: flex;
-}
+button:disabled { background-color: #ccc; }
 
 #press-button {
     height: 200px;
@@ -208,8 +94,6 @@ button:disabled {
     border-radius: 8px;
     user-select: none;
 }
-
-/* --- Motor Calibration Screen Styles --- */
 #motor-area-container {
     display: flex;
     justify-content: center;
@@ -219,12 +103,7 @@ button:disabled {
     border-radius: 8px;
     padding: 20px;
 }
-
-#btn-start-calibration {
-    padding: 20px 40px;
-    font-size: 1.2em;
-}
-
+#btn-start-calibration { padding: 20px 40px; font-size: 1.2em; }
 #motor-area {
     width: 100%;
     height: 100%;
@@ -233,114 +112,44 @@ button:disabled {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    background-color: #dcdcdc; /* Higher contrast background */
+    background-color: #dcdcdc;
     border: 2px dashed #aaaaaa;
     border-radius: 8px;
 }
+#motor-area.responded { background-color: #a8d58c; }
+#motor-area p { font-size: 1.5em; color: #333; user-select: none; }
 
-#motor-area.responded {
-    background-color: #a8d58c; /* Greenish background for response feedback */
-}
-
-#motor-area p {
-    font-size: 1.5em;
-    color: #333;
-    user-select: none;
-}
-
-/* --- Overlay Controls Styles --- */
-.overlay-controls {
-    position: absolute;
-    bottom: 5vh; /* Position at 5% from the bottom of the viewport */
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.95);
-    padding: 15px 20px;
-    border-radius: 40px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    z-index: 1001; /* Ensure controls are on top of the radial menu backdrop */
-    display: flex;
-    gap: 15px;
-}
-
-/* =========================================================
-   ★ 読みやすさ（コントラスト）改善：上書き
-   ========================================================= */
-
-.radial-menu .candidate-btn {
-    color: #111111;
-    border: 2px solid #333333;
-    background-color: #ffffff;
-    font-weight: 700;
-}
-
-.radial-menu .candidate-btn:hover {
-    background-color: #e6f2ff;
-    border-color: #005fcc;
-}
-
-.radial-menu .candidate-btn.branch {
-    background-color: #f0f0f0;
-    border-style: dashed;
-}
-
-.radial-menu .candidate-btn.selected,
-.choice-btn.selected {
-    background-color: #005fcc;
-    color: #ffffff;
-    border-color: #003a80;
-    box-shadow: 0 0 0 3px rgba(0,95,204,0.35);
-}
-
-.gojuon-grid .initial-btn:not(.placeholder):not([disabled]) {
-    color: #003a80;
-}
-
-.radial-menu .candidate-btn {
-    letter-spacing: 0.02em;
-}
-
-/* =========================================================
-   ★ Pie menu (donut sectors) — shortest movement
-   ========================================================= */
-
+/* --- Pie Menu --- */
 .pie-overlay{
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.2);
   z-index: 1000;
-
-  /* ★ overlayが下のUIをブロックしない */
   pointer-events: none;
 }
-
 .pie-svg{
   position: absolute;
   left: 0; top: 0;
   width: 100vw;
   height: 100vh;
-
   pointer-events: none;
 }
-
 .pie-sector{
   pointer-events: auto;
   stroke: #111;
   stroke-width: 2;
   fill: #fff;
+  cursor: pointer;
+  transition: fill 0.1s ease;
 }
-
-.pie-sector:hover,
-.pie-sector.active{
+.pie-sector:hover, .pie-sector.active{
   fill: #e6f2ff;
   stroke: #005fcc;
 }
-
 .pie-sector.selected{
   fill: #005fcc;
   stroke: #003a80;
 }
-
 .pie-label{
   font-size: 16px;
   font-weight: 700;
@@ -348,16 +157,13 @@ button:disabled {
   user-select: none;
   pointer-events: none;
 }
-
 .pie-label.selected{
   fill: #fff;
 }
-
-/* パイメニュー近くの操作ボタン（決定/戻る） */
 .pie-controls{
   position: absolute;
   transform: translate(-50%, -50%);
-  pointer-events: auto; /* ここだけクリックできる */
+  pointer-events: auto;
   z-index: 1001;
   display: flex;
   gap: 10px;
@@ -367,7 +173,6 @@ button:disabled {
   padding: 10px 12px;
   box-shadow: 0 4px 14px rgba(0,0,0,0.25);
 }
-
 .pie-controls button{
   background: #005fcc;
   color: #fff;
@@ -376,14 +181,14 @@ button:disabled {
   padding: 8px 14px;
   font-weight: 700;
 }
-
 .pie-controls button:disabled{
   background: #bbb;
   border-color: #999;
   color: #555;
+  cursor: not-allowed;
 }
 
-/* 任意：長い決まり字の視認性を少し改善（ボタン式が残っててもOK） */
-.radial-menu .candidate-btn{
-  max-width: 200px;
+#results-stats {
+    font-size: 16px;
+    line-height: 1.6;
 }
