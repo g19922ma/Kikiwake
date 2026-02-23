@@ -9,7 +9,8 @@
 // - Clamp pie menu position to viewport to prevent clipping
 // - Removed redundant bottom buttons, central pie-controls are sufficient.
 // - Removed save status messages (at user request)
-// - NEW: Add descriptive headers and timestamps to all spreadsheet data
+// - Removed initial non-visual delay for Main Experiment phase (start quickly)
+// - NEW: Bugfix in final statistics calculation (S value)
 // ==========================
 
 // ==========================
@@ -17,7 +18,7 @@
 // ==========================
 const CONFIG = {
   // ▼▼▼▼▼ ここに、デプロイしたGoogle Apps ScriptのウェブアプリURLを貼り付けてください ▼▼▼▼▼
-  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbwhJ6uVrwfy3jtk1_wK3caF7e3QlGDP1QIgHsrzZkYV9epnCqGBQ7So9wjx6nCLWGEl/exec",
+  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbw_pgBb-05_bV_ncN_kTgzvuSgpAzd0C_iRYlt9xbw5mgpsaEYm1KmO1lGV4NGag1CA/exec",
   // ▲▲▲▲▲ ここまで ▲▲▲▲▲
   motorTrials: 30,
   mainRepetitions: 6,
@@ -28,7 +29,9 @@ const CONFIG = {
   beepFreq: 440,
   beepDuration: 0.1,
   minWait: 800,
-  maxWait: 1600
+  maxWait: 1600,
+  PRE_PHASE_DELAY_MS: 1000, // Delay before the first motor trial beep
+  MOTOR_INTER_RESPONSE_DELAY_MS: 1000 // NEW: Delay after motor response before next trial begins
 };
 
 const TEST_CONFIG = {
@@ -141,29 +144,23 @@ function showScreen(id) {
 // Spreadsheet Integration
 // ==========================
 async function sendDataToSheet(type, data) {
-  if (!CONFIG.GAS_WEB_APP_URL || CONFIG.GAS_WEB_APP_URL === "YOUR_GAS_WEB_APP_URL_HERE") {
-    console.warn("GAS_WEB_APP_URL is not configured. Skipping spreadsheet write.");
-    return;
-  }
+  if (!CONFIG.GAS_WEB_APP_URL) return;
 
-  try {
-    const payload = { type, data };
-    const response = await fetch(CONFIG.GAS_WEB_APP_URL, {
-      method: 'POST',
-      cache: 'no-cache',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-    
-    if (response.ok) {
-       console.log(`Successfully sent data of type '${type}' to Google Sheet.`);
-    } else {
-        throw new Error(`Request to Google Sheet failed with status: ${response.status}`);
-    }
-  } catch (error) {
-    console.error('Error sending data to Google Sheet:', error);
-  }
+  const payload = { type, data };
+  const res = await fetch(CONFIG.GAS_WEB_APP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+
+  const text = await res.text();
+  console.log("GAS raw response:", text);
+
+  let json = null;
+  try { json = JSON.parse(text); } catch {}
+  if (!res.ok) console.error("HTTP error:", res.status);
+  if (json?.status === "error") console.error("GAS error:", json.message);
+  if (json?.status === "success") console.log("GAS success:", json);
 }
 
 
@@ -266,7 +263,7 @@ function handlePress(e) {
     setTimeout(() => {
       document.getElementById("motor-area")?.classList.remove("responded");
       nextMotorTrial();
-    }, 500);
+    }, CONFIG.MOTOR_INTER_RESPONSE_DELAY_MS); // NEW: Use configurable delay
     return;
   }
 
@@ -298,6 +295,8 @@ function startMotorPhase() {
   if (el) el.textContent = total;
 
   showScreen("motor");
+  // The 'Start Calibration' button on the motor screen calls nextMotorTrial()
+  // No need for a global delay here, as nextMotorTrial handles the first trial delay.
 }
 
 function nextMotorTrial() {
@@ -322,7 +321,13 @@ function nextMotorTrial() {
   const counter = document.getElementById("motor-counter");
   if (counter) counter.textContent = state.currentMotorTrial;
 
-  const delay = currentConfig.minWait + Math.random() * (currentConfig.maxWait - currentConfig.minWait);
+  let delayBeforeBeep = currentConfig.minWait + Math.random() * (currentConfig.maxWait - currentConfig.minWait);
+
+  // Add an additional initial delay only for the very first motor trial
+  if (state.currentMotorTrial === 1) {
+      delayBeforeBeep += CONFIG.PRE_PHASE_DELAY_MS;
+  }
+
   setTimeout(() => {
     state.phase = "motor_waiting";
     const ctx = getAudioContext();
@@ -334,7 +339,7 @@ function nextMotorTrial() {
     osc.start();
     osc.stop(ctx.currentTime + CONFIG.beepDuration);
     state.t0 = performance.now();
-  }, delay);
+  }, delayBeforeBeep);
 }
 
 // ==========================
@@ -385,6 +390,7 @@ async function startMainPhase() {
   if (totalTrials) totalTrials.textContent = state.trialDeck.length;
 
   renderChoiceScreen();
+  // Call nextMainTrial directly without an extra delay
   nextMainTrial();
 }
 
