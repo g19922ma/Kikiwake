@@ -1,37 +1,18 @@
 // ==========================
-// app.js (FULL)
-// - Pie-menu (donut sectors) that expands OUTWARD only in the hovered wedge
-// - Fix: n===1 selectable (full ring path)
-// - Fix: selection highlight remains visible until confirm/back (NO layout shift on click)
-// - Randomize menu positions EACH TRIAL (fairness) with seeded shuffle + random rotation
-// - Spreadsheet integration for results (Main Trials and Summary)
-// - Curved text labels for readability
-// - Clamp pie menu position to viewport to prevent clipping
-// - Removed redundant bottom buttons, central pie-controls are sufficient.
-// - Removed save status messages (at user request)
-// - Removed initial non-visual delay for Main Experiment phase (start quickly)
-// - NEW: Bugfix in final statistics calculation (S value)
+// app.js (ULTIMATE INTEGRATED VERSION)
 // ==========================
 
-// ==========================
-// Configuration
-// ==========================
 const CONFIG = {
-  // ▼▼▼▼▼ ここに、デプロイしたGoogle Apps ScriptのウェブアプリURLを貼り付けてください ▼▼▼▼▼
-  GAS_WEB_APP_URL: "https://script.google.com/macros/s/AKfycbw_pgBb-05_bV_ncN_kTgzvuSgpAzd0C_iRYlt9xbw5mgpsaEYm1KmO1lGV4NGag1CA/exec",
-  // ▲▲▲▲▲ ここまで ▲▲▲▲▲
   motorTrials: 30,
   mainRepetitions: 6,
   totalCategories: 100,
-  breakInterval: 50,
+  breakInterval: 10,
   cueSoundPlaybackDuration: 2,
   cueSoundSilenceDuration: 1000,
   beepFreq: 440,
   beepDuration: 0.1,
   minWait: 800,
-  maxWait: 1600,
-  PRE_PHASE_DELAY_MS: 1000, // Delay before the first motor trial beep
-  MOTOR_INTER_RESPONSE_DELAY_MS: 1000 // NEW: Delay after motor response before next trial begins
+  maxWait: 1600
 };
 
 const TEST_CONFIG = {
@@ -45,8 +26,11 @@ const TEST_CONFIG = {
   maxWait: 200
 };
 
+const GOOGLE_APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIhJmEIxwGPdrz7y344x-NR0pi0qDI8AainLiipmtfLqSpqcRa40LOF6K8yO2sHL1e/exec";
+const BASE_PATH = location.pathname.replace(/\/[^\/]*$/, "/");
+
 // ==========================
-// Seeded RNG + Shuffle (for fair random positions)
+// Utilities
 // ==========================
 function mulberry32(seed) {
   let t = seed >>> 0;
@@ -57,7 +41,6 @@ function mulberry32(seed) {
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
   };
 }
-
 function shuffleWithRng(arr, rng) {
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -66,7 +49,6 @@ function shuffleWithRng(arr, rng) {
   }
   return a;
 }
-
 function hashStringToUint(str) {
   let h = 2166136261 >>> 0;
   for (let i = 0; i < str.length; i++) {
@@ -81,13 +63,14 @@ function hashStringToUint(str) {
 // ==========================
 let state = {
   participantId: "",
+  participantSeed: 0,
   inputDevice: "",
   phase: "idle",
   isTestMode: false,
-
-  // experiment
-  selectionStep: 1,
-  selectedInitial: "",
+  isResumed: false,
+  resumedTrialCount: 0,
+  motorCompletedCount: 0,
+  sessionTimestamp: new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, ''),
   cueAudioBuffer: null,
   motorResults: [],
   currentMotorTrial: 0,
@@ -99,843 +82,479 @@ let state = {
   currentTrialIndex: 0,
   currentTrialData: null,
   mainResults: [],
-  unsentTrialResults: [], // Buffer for spreadsheet writing
+  unsavedResults: [],
   t0: 0,
   audioCtx: null,
-  summaryStats: null,
-
-  // menu
-  currentMenuLevel: 0,
-  menuHistory: [],
-  currentLevelMenuItems: [],
-  currentRadialMenuOrigin: { x: 0, y: 0 },
   selectedChoice: null,
-
-  // selection lock
-  isMenuLockedBySelection: false,
-
-  // fairness randomization (trial-seeded)
   menuSeedBase: 0,
-  menuRng: null
+  currentLevelMenuItems: [],
+  pieMenuCX: 0,
+  pieMenuCY: 0,
+  reader: "sounds_Inaba"
 };
 
 // ==========================
-// DOM Elements
-// ==========================
-const screens = {
-  welcome: document.getElementById("screen-welcome"),
-  motor: document.getElementById("screen-motor"),
-  mainIntro: document.getElementById("screen-main-intro"),
-  trial: document.getElementById("screen-trial"),
-  choice: document.getElementById("screen-choice"),
-  break: document.getElementById("screen-break"),
-  results: document.getElementById("screen-results")
-};
-
-// ==========================
-// Screen control
-// ==========================
-function showScreen(id) {
-  Object.values(screens).forEach((s) => s && s.classList.remove("active"));
-  if (screens[id]) screens[id].classList.add("active");
-}
-
-// ==========================
-// Spreadsheet Integration
-// ==========================
-async function sendDataToSheet(type, data) {
-  if (!CONFIG.GAS_WEB_APP_URL) return;
-
-  const payload = { type, data };
-  const res = await fetch(CONFIG.GAS_WEB_APP_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await res.text();
-  console.log("GAS raw response:", text);
-
-  let json = null;
-  try { json = JSON.parse(text); } catch {}
-  if (!res.ok) console.error("HTTP error:", res.status);
-  if (json?.status === "error") console.error("GAS error:", json.message);
-  if (json?.status === "success") console.log("GAS success:", json);
-}
-
-
-// ==========================
-// Audio
+// Audio Optimization
 // ==========================
 function getAudioContext() {
-  if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!state.audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    state.audioCtx = new AudioContextClass({ latencyHint: 'interactive' });
+  }
   return state.audioCtx;
 }
-
 let currentSource = null;
+let currentGainNode = null;
 
 async function playSound(sourceData, { offset = 0, duration = undefined, isCue = false } = {}) {
-  return new Promise(async (resolve, reject) => {
-    const ctx = getAudioContext();
-    if (ctx.state === "suspended") await ctx.resume();
-    try {
-      let audioBuffer;
-      if (typeof sourceData === "string") {
-        const response = await fetch(sourceData);
-        if (!response.ok) throw new Error("HTTPエラー");
-        audioBuffer = await ctx.decodeAudioData(await response.arrayBuffer());
-      } else if (sourceData instanceof AudioBuffer) {
-        audioBuffer = sourceData;
-      } else {
-        throw new Error("Invalid sourceData");
-      }
+  const ctx = getAudioContext();
+  if (ctx.state === "suspended") await ctx.resume();
+  try {
+    let audioBuffer;
+    if (typeof sourceData === "string") {
+      const url = /^(https?:)?\/\//.test(sourceData) ? sourceData : (BASE_PATH + sourceData);
+      const res = await fetch(url);
+      audioBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
+    } else { audioBuffer = sourceData; }
+    
+    stopSound();
+    const source = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    source.buffer = audioBuffer;
+    source.connect(gain);
+    gain.connect(ctx.destination);
+    
+    if (!isCue) state.t0 = performance.now();
+    source.start(0, Math.max(0, offset), duration === undefined ? audioBuffer.duration - Math.max(0, offset) : duration);
+    currentSource = source; currentGainNode = gain;
+    return new Promise(resolve => {
+      source.onended = () => { if (currentSource === source) { currentSource = null; currentGainNode = null; } resolve(); };
+    });
+  } catch (e) { console.error("Audio Error:", e); }
+}
+function stopSound() {
+  const ctx = getAudioContext();
+  if (currentGainNode) {
+    currentGainNode.gain.cancelScheduledValues(ctx.currentTime);
+    currentGainNode.gain.setValueAtTime(0, ctx.currentTime);
+  }
+  if (currentSource) { try { currentSource.stop(0); } catch(e){} currentSource = null; }
+}
 
-      if (currentSource) currentSource.stop();
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-
-      if (!isCue) state.t0 = performance.now();
-
-      source.start(
-        0,
-        Math.max(0, offset),
-        duration === undefined ? audioBuffer.duration - Math.max(0, offset) : duration
-      );
-
-      currentSource = source;
-
-      source.onended = () => {
-        if (currentSource === source) currentSource = null;
-        resolve(audioBuffer);
-      };
-    } catch (e) {
-      console.error("playSoundでのエラー:", e);
-      reject(e);
-    }
+// ==========================
+// UI Logic
+// ==========================
+const screens = ["welcome", "loading", "motor", "main-intro", "trial", "choice", "break", "results"];
+function showScreen(id) {
+  screens.forEach(s => {
+    const el = document.getElementById("screen-" + s);
+    if (el) el.classList.toggle("active", s === id);
   });
 }
 
-function stopSound() {
-  if (currentSource) {
-    currentSource.stop();
-    currentSource = null;
-  }
+// ==========================
+// Data Communication
+// ==========================
+async function postToGoogleSheet(payload) {
+  try {
+    await fetch(GOOGLE_APPS_SCRIPT_WEB_APP_URL, { method: 'POST', body: JSON.stringify(payload) });
+  } catch (e) { console.error("GAS Post Error:", e); }
 }
 
 // ==========================
-// Gamepad
+// Phase: Motor Calibration
 // ==========================
-let lastGamepadState = false;
-function gamepadLoop() {
-  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
-  let pressed = false;
-  for (const gp of gamepads) {
-    if (gp && gp.buttons.some((b) => b.pressed)) {
-      pressed = true;
-      break;
+async function startMotorPhase() {
+  const id = (document.getElementById("participant-id").value || "anon").toLowerCase();
+  state.participantId = id;
+  state.inputDevice = document.getElementById("input-device").value;
+  state.reader = document.getElementById("reader-select").value;
+  state.isTestMode = document.getElementById("test-mode-toggle").checked;
+
+  showScreen("loading");
+
+  // GASに問い合わせてシードと進捗を取得
+  state.participantSeed = hashStringToUint(id); // fallback
+  try {
+    const res = await fetch(GOOGLE_APPS_SCRIPT_WEB_APP_URL, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'get_status', data: { participant_id: id } })
+    });
+    const result = await res.json();
+    if (result.status === "success") {
+      state.resumedTrialCount = result.data.completedCount;
+      state.motorCompletedCount = result.data.motorCompletedCount;
+      if (state.resumedTrialCount > 0) state.isResumed = true;
+      if (result.data.seed) {
+        state.participantSeed = result.data.seed;
+      } else {
+        // 新規参加者：シードを生成してGASに登録
+        state.participantSeed = hashStringToUint(id + Date.now());
+        postToGoogleSheet({ type: 'register_seed', data: { participant_id: id, seed: state.participantSeed } });
+      }
+      // 実験完了済みチェック（テストモードは除く）
+      const totalRequired = CONFIG.totalCategories * CONFIG.mainRepetitions;
+      if (!state.isTestMode && state.resumedTrialCount >= totalRequired) {
+        document.getElementById("results-stats").innerHTML =
+          `<p>参加者ID「${state.participantId}」はすでに実験をすべて完了しています。</p>`;
+        showScreen("results");
+        return;
+      }
     }
+  } catch (e) { console.warn("Status Check Failed:", e); }
+
+  getAudioContext();
+  state.phase = "motor_idle";
+  state.motorResults = [];
+  
+  const normalTarget = (state.isTestMode ? TEST_CONFIG : CONFIG).motorTrials;
+  if (state.isResumed) {
+    state.currentMotorTrial = 0;
+    state.targetMotorTrials = 5;
+    alert(`参加者ID: ${id} の続きから再開します。\n（コンディション確認のため、反応速度テストを5回実施します）`);
+  } else {
+    state.currentMotorTrial = state.motorCompletedCount;
+    state.targetMotorTrials = normalTarget;
   }
-  if (pressed && !lastGamepadState && (state.phase === "motor_waiting" || state.phase === "main_listening")) {
-    handlePress({ type: "gamepad" });
-  }
-  lastGamepadState = pressed;
-  requestAnimationFrame(gamepadLoop);
+  
+  document.getElementById("motor-total-trials").textContent = state.targetMotorTrials;
+  showScreen("motor");
 }
 
-// ==========================
-// Input press handler
-// ==========================
 function handlePress(e) {
   const now = performance.now();
-
   if (state.phase === "motor_waiting") {
+    // フィードバックを最初に（即時反応）
+    const motorArea = document.getElementById("motor-area");
+    if (motorArea) motorArea.classList.add("responded");
     stopSound();
-    state.motorResults.push({
-      participant_id: state.participantId,
-      timestamp: new Date().toISOString(),
-      motor_trial_num: state.currentMotorTrial,
-      rt_ms: now - state.t0,
-      input_device: e.type || "不明"
-    });
-    document.getElementById("motor-area")?.classList.add("responded");
+    const rt = now - state.t0;
+    const res = { participant_id: state.participantId, session_timestamp: state.sessionTimestamp, trial_start_time: state.lastMotorStartTimeJst, trial_num: state.currentMotorTrial, rt_ms: rt, input_device: e.type || "不明" };
+    state.motorResults.push(res);
+    postToGoogleSheet({ type: 'motor_trial', data: res });
     state.phase = "motor_idle";
-    setTimeout(() => {
-      document.getElementById("motor-area")?.classList.remove("responded");
-      nextMotorTrial();
-    }, CONFIG.MOTOR_INTER_RESPONSE_DELAY_MS); // NEW: Use configurable delay
-    return;
-  }
-
-  if (state.phase === "main_listening") {
+    setTimeout(() => { if (motorArea) motorArea.classList.remove("responded"); }, 400);
+    setTimeout(nextMotorTrial, 500);
+  } else if (state.phase === "main_listening") {
     stopSound();
     state.currentTrialData.press_time = now - state.t0;
     state.currentTrialData.t_prime = state.currentTrialData.press_time - state.t_motor;
-    state.currentTrialData.input_device = e.type || "不明";
+    state.currentTrialData.t_press_absolute = now;
     state.phase = "main_choosing";
     showScreen("choice");
-    return;
+    renderChoiceScreen();
   }
-}
-
-// ==========================
-// Motor phase
-// ==========================
-function startMotorPhase() {
-  state.participantId = document.getElementById("participant-id")?.value || "anon";
-  state.inputDevice = document.getElementById("input-device")?.value || "";
-  getAudioContext();
-
-  state.phase = "motor_idle";
-  state.currentMotorTrial = 0;
-  state.motorResults = [];
-
-  const total = (state.isTestMode ? TEST_CONFIG : CONFIG).motorTrials;
-  const el = document.getElementById("motor-total-trials");
-  if (el) el.textContent = total;
-
-  showScreen("motor");
-  // The 'Start Calibration' button on the motor screen calls nextMotorTrial()
-  // No need for a global delay here, as nextMotorTrial handles the first trial delay.
 }
 
 function nextMotorTrial() {
-  const currentConfig = state.isTestMode ? TEST_CONFIG : CONFIG;
-
-  if (state.currentMotorTrial >= currentConfig.motorTrials) {
-    const rts = state.motorResults.map((r) => r.rt_ms).sort((a, b) => a - b);
+  if (state.currentMotorTrial >= state.targetMotorTrials) {
+    const rts = state.motorResults.map(r => r.rt_ms).sort((a,b) => a-b);
     if (rts.length > 0) {
       const mid = Math.floor(rts.length / 2);
-      state.t_motor = rts.length % 2 !== 0 ? rts[mid] : (rts[mid - 1] + rts[mid]) / 2;
+      state.t_motor = rts.length % 2 !== 0 ? rts[mid] : (rts[mid-1]+rts[mid])/2;
     }
-    // Send motor results before proceeding
-    if (state.motorResults.length > 0) {
-      sendDataToSheet('motor_trials_batch', state.motorResults);
-      state.motorResults = []; // Clear results after sending
-    }
-    showScreen("mainIntro");
+    showScreen("main-intro");
     return;
   }
-
   state.currentMotorTrial++;
-  const counter = document.getElementById("motor-counter");
-  if (counter) counter.textContent = state.currentMotorTrial;
-
-  let delayBeforeBeep = currentConfig.minWait + Math.random() * (currentConfig.maxWait - currentConfig.minWait);
-
-  // Add an additional initial delay only for the very first motor trial
-  if (state.currentMotorTrial === 1) {
-      delayBeforeBeep += CONFIG.PRE_PHASE_DELAY_MS;
-  }
-
+  document.getElementById("motor-counter").textContent = state.currentMotorTrial;
+  
+  const config = state.isTestMode ? TEST_CONFIG : CONFIG;
+  
+  // 試行間の「間（ま）」を確保
+  // カウントアップしてから、一定の準備時間(1000ms) + ランダムな待機時間
+  const preparationTime = 1000; 
+  const randomWait = config.minWait + Math.random() * (config.maxWait - config.minWait);
+  
   setTimeout(() => {
     state.phase = "motor_waiting";
+    const jstNow = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
     const ctx = getAudioContext();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(ctx.destination);
     osc.frequency.value = CONFIG.beepFreq;
-    osc.start();
-    osc.stop(ctx.currentTime + CONFIG.beepDuration);
+    osc.start(); osc.stop(ctx.currentTime + CONFIG.beepDuration);
     state.t0 = performance.now();
-  }, delayBeforeBeep);
+    state.lastMotorStartTimeJst = jstNow;
+  }, preparationTime + randomWait);
 }
 
 // ==========================
-// Main phase
+// Phase: Main Task
 // ==========================
 async function startMainPhase() {
+  const reader = state.reader || "sounds_Inaba";
   try {
     const ctx = getAudioContext();
-    const response = await fetch("I-000B.ogg");
-    if (!response.ok) throw new Error("合図音ファイルが見つかりません");
-    state.cueAudioBuffer = await ctx.decodeAudioData(await response.arrayBuffer());
-  } catch (e) {
-    console.error("合図音のプリロードに失敗しました", e);
-    alert("致命的なエラー: 合図音を読み込めませんでした。");
-    return;
+    const cueFile = reader === "sounds_kimoto" ? "sounds_kimoto/序歌.m4a" : "sounds_Inaba/I-000B.ogg";
+    const res = await fetch(BASE_PATH + cueFile);
+    state.cueAudioBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
+  } catch(e){ console.error("Cue load error:", e); }
+
+  const config = state.isTestMode ? TEST_CONFIG : CONFIG;
+  const kimarijiMap = new Map(state.kimarijiData.map(k => [k.id, k.kimariji]));
+  if (reader === "sounds_kimoto") {
+    state.cardData = state.kimarijiData.map(k => ({
+      id: k.id, label: k.kimariji, path: `sounds_kimoto/${k.kimariji} 上.m4a`, kimariji: k.kimariji
+    }));
+  } else {
+    state.cardData = state.manifest.filter(m => m.path.endsWith("A.ogg")).map(m => ({ id: m.category_id, label: m.label, path: m.path, kimariji: kimarijiMap.get(m.category_id) || "" })).filter(c => c.kimariji);
   }
-
-  const currentConfig = state.isTestMode ? TEST_CONFIG : CONFIG;
-
-  const kimarijiMap = new Map(state.kimarijiData.map((k) => [k.id, k.kimariji]));
-  state.cardData = state.manifest
-    .filter((m) => m.path.endsWith("A.ogg"))
-    .map((m) => ({
-      id: m.category_id,
-      label: m.label,
-      path: m.path,
-      kimariji: kimarijiMap.get(m.category_id) || ""
-    }))
-    .filter((c) => c.kimariji);
-
-  let availableCards = state.isTestMode
-    ? state.cardData.filter((c) => new Set(currentConfig.testCategoryIds).has(c.id))
-    : state.cardData.filter((c) => c.id <= currentConfig.totalCategories);
-
+  
   let deck = [];
-  for (const card of availableCards) {
-    for (let r = 0; r < currentConfig.mainRepetitions; r++) {
-      deck.push({ stimulus_id: card.id, stimulus_file: card.path, rep: r });
+  let cards = state.isTestMode ? state.cardData.filter(c => new Set(config.testCategoryIds).has(c.id)) : state.cardData.filter(c => c.id <= config.totalCategories);
+  for (const card of cards) {
+    for (let r = 0; r < config.mainRepetitions; r++) {
+      deck.push({ stimulus_id: card.id, stimulus_file: card.path, rep: r, kimariji: card.kimariji });
     }
   }
-
-  state.trialDeck = shuffle(deck).map((t, i) => ({ ...t, trial_index: i + 1 }));
-  state.currentTrialIndex = 0;
-  state.mainResults = [];
-  state.unsentTrialResults = [];
-
-  const totalTrials = document.getElementById("total-trials");
-  if (totalTrials) totalTrials.textContent = state.trialDeck.length;
-
-  renderChoiceScreen();
-  // Call nextMainTrial directly without an extra delay
+  state.trialDeck = shuffleWithRng(deck, mulberry32(state.participantSeed)).map((t, i) => ({ ...t, trial_index: i + 1 }));
+  
+  state.currentTrialIndex = state.isResumed ? state.resumedTrialCount : 0;
+  document.getElementById("total-trials").textContent = state.trialDeck.length;
   nextMainTrial();
 }
 
-async function startTrialWithCue(trial) {
-  try {
-    const cueDuration = state.cueAudioBuffer.duration;
-    const offset = Math.max(0, cueDuration - CONFIG.cueSoundPlaybackDuration);
-
-    await playSound(state.cueAudioBuffer, {
-      offset,
-      duration: CONFIG.cueSoundPlaybackDuration,
-      isCue: true
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, CONFIG.cueSoundSilenceDuration));
-
-    state.phase = "main_listening";
-    playSound(trial.stimulus_file, {});
-  } catch (error) {
-    console.error("試行の再生エラー:", error);
-    alert("再生エラーが発生しました。");
-    state.currentTrialIndex++;
-    nextMainTrial();
+function nextMainTrial(fromBreak = false) {
+  if (state.currentTrialIndex >= state.trialDeck.length) { finishExperiment(); return; }
+  const config = state.isTestMode ? TEST_CONFIG : CONFIG;
+  if (!fromBreak && state.currentTrialIndex > 0 && state.currentTrialIndex % config.breakInterval === 0) {
+    sendBatchToGoogleSheet(); showScreen("break"); return;
   }
-}
-
-function proceedToNextTrial() {
   const trial = state.trialDeck[state.currentTrialIndex];
   state.currentTrialData = { ...trial };
-
-  const base = hashStringToUint(
-    `${state.participantId}|${trial.trial_index}|${trial.stimulus_id}|${trial.rep}`
-  );
-  state.menuSeedBase = base;
-  state.menuRng = mulberry32(base);
-
-  renderChoiceScreen();
+  state.selectedChoice = null;
   showScreen("trial");
-
-  const counter = document.getElementById("trial-counter");
-  if (counter) counter.textContent = state.currentTrialIndex + 1;
-
+  document.getElementById("trial-counter").textContent = state.currentTrialIndex + 1;
+  document.getElementById("total-trials").textContent = state.trialDeck.length;
   startTrialWithCue(trial);
 }
 
-function nextMainTrial() {
-  const currentConfig = state.isTestMode ? TEST_CONFIG : CONFIG;
-
-  if (state.currentTrialIndex >= state.trialDeck.length) {
-    finishExperiment();
-    return;
-  }
-
-  if (state.currentTrialIndex > 0 && state.currentTrialIndex % currentConfig.breakInterval === 0) {
-    showScreen("break");
-    if (state.unsentTrialResults.length > 0) {
-      sendDataToSheet('trials_batch', state.unsentTrialResults);
-      state.unsentTrialResults = []; // Clear buffer after sending
-    }
-    return;
-  }
-
-  proceedToNextTrial();
-}
-
-function resumeFromBreak() {
-  proceedToNextTrial();
+async function startTrialWithCue(trial) {
+  const cueDuration = state.cueAudioBuffer.duration;
+  const offset = Math.max(0, cueDuration - CONFIG.cueSoundPlaybackDuration);
+  await playSound(state.cueAudioBuffer, { offset, duration: CONFIG.cueSoundPlaybackDuration, isCue: true });
+  await new Promise(r => setTimeout(r, CONFIG.cueSoundSilenceDuration));
+  state.phase = "main_listening";
+  state.currentTrialData.trial_start_time = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
+  playSound(trial.stimulus_file, {});
 }
 
 // ==========================
-// Pie Menu (donut sectors) with wedge-only expansion
+// Pie Menu (Fixed with Center Button)
 // ==========================
+function polarToXY(cx, cy, r, a) { return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }; }
 
-function polarToXY(cx, cy, r, a) {
-  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+// SVGを消さずに選択状態だけ更新（ちらつき防止）
+function applyPieSelection(svg) {
+  svg.querySelectorAll('[data-card-id]').forEach(el => {
+    const selected = Number(el.getAttribute('data-card-id')) === state.selectedChoice;
+    el.setAttribute('class', (el.tagName === 'path' ? 'pie-sector' : 'pie-label') + (selected ? ' selected' : ''));
+  });
+  svg.querySelector('.pie-center-circle')?.setAttribute('class', 'pie-center-circle active');
+  const ct = svg.querySelector('.pie-center-text');
+  if (ct) ct.textContent = '決定';
+  const cg = svg.querySelector('.pie-center-group');
+  if (cg) cg.onclick = (e) => { e.stopPropagation(); confirmChoice(); };
+}
+function applyPieDeselection(svg) {
+  svg.querySelectorAll('[data-card-id]').forEach(el => {
+    el.setAttribute('class', el.tagName === 'path' ? 'pie-sector' : 'pie-label');
+  });
+  svg.querySelector('.pie-center-circle')?.setAttribute('class', 'pie-center-circle back');
+  const ct = svg.querySelector('.pie-center-text');
+  if (ct) ct.textContent = '戻る';
+  const cg = svg.querySelector('.pie-center-group');
+  if (cg) cg.onclick = (e) => { e.stopPropagation(); goBackInMenu(); };
+}
+function donutPath(cx, cy, inner, outer, start, end) {
+  // 360度（フル円）の場合、始点と終点が重なると描画されないため、微小な隙間を空ける
+  if (end - start >= 2 * Math.PI) end = start + 2 * Math.PI - 0.0001;
+  const large = end - start > Math.PI ? 1 : 0;
+  const p1=polarToXY(cx,cy,outer,start), p2=polarToXY(cx,cy,outer,end), p3=polarToXY(cx,cy,inner,end), p4=polarToXY(cx,cy,inner,start);
+  return `M ${p1.x} ${p1.y} A ${outer} ${outer} 0 ${large} 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${inner} ${inner} 0 ${large} 0 ${p4.x} ${p4.y} Z`;
 }
 
-function donutSectorPath(cx, cy, innerR, outerR, startA, endA) {
-  const largeArc = (endA - startA) > Math.PI ? 1 : 0;
-  const p1 = polarToXY(cx, cy, outerR, startA);
-  const p2 = polarToXY(cx, cy, outerR, endA);
-  const p3 = polarToXY(cx, cy, innerR, endA);
-  const p4 = polarToXY(cx, cy, innerR, startA);
-  return [ `M ${p1.x} ${p1.y}`, `A ${outerR} ${outerR} 0 ${largeArc} 1 ${p2.x} ${p2.y}`, `L ${p3.x} ${p3.y}`, `A ${innerR} ${innerR} 0 ${largeArc} 0 ${p4.x} ${p4.y}`, "Z" ].join(" ");
-}
+function renderPieRoot(cx, cy, items, parentLabel = "") {
+  state.pieMenuCX = cx;
+  state.pieMenuCY = cy;
+  // 毎回ランダムにするための新しいシード生成
+  state.menuSeedBase = Math.floor(Math.random() * 0xFFFFFFFF);
 
-function donutFullRingPath(cx, cy, innerR, outerR) {
-  const o1 = polarToXY(cx, cy, outerR, -Math.PI / 2);
-  const o2 = polarToXY(cx, cy, outerR, Math.PI / 2);
-  const i1 = polarToXY(cx, cy, innerR, -Math.PI / 2);
-  const i2 = polarToXY(cx, cy, innerR, Math.PI / 2);
-  return [ `M ${o1.x} ${o1.y}`, `A ${outerR} ${outerR} 0 1 1 ${o2.x} ${o2.y}`, `A ${outerR} ${outerR} 0 1 1 ${o1.x} ${o1.y}`, `L ${i1.x} ${i1.y}`, `A ${innerR} ${innerR} 0 1 0 ${i2.x} ${i2.y}`, `A ${innerR} ${innerR} 0 1 0 ${i1.x} ${i1.y}`, "Z" ].join(" ");
-}
-
-function clampToViewport(x, y, pad = 16) {
-  return { x: Math.min(Math.max(x, pad), window.innerWidth - pad), y: Math.min(Math.max(y, pad), window.innerHeight - pad) };
-}
-
-function ensurePieOverlay() {
   let overlay = document.getElementById("pie-overlay");
   if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.id = "pie-overlay";
-    overlay.className = "pie-overlay";
-    overlay.innerHTML = `
-      <svg class="pie-svg" id="pie-svg"></svg>
-      <div class="pie-controls" id="pie-controls" style="left:50vw; top:50vh;">
-        <button id="pie-back" type="button">戻る</button>
-        <button id="pie-confirm" type="button" disabled>決定</button>
-      </div>
-    `;
+    overlay = document.createElement("div"); overlay.id = "pie-overlay"; overlay.className = "pie-overlay";
+    overlay.innerHTML = `<svg id="pie-svg" class="pie-svg"></svg>`;
     document.body.appendChild(overlay);
-    overlay.querySelector("#pie-back").addEventListener("click", (e) => { e.stopPropagation(); goBackInMenu(); });
-    overlay.querySelector("#pie-confirm").addEventListener("click", (e) => { e.stopPropagation(); confirmChoice(); });
-    overlay.addEventListener("click", (e) => { e.stopPropagation(); });
   }
-  return overlay;
-}
 
-function clearPieOverlay() {
-  const overlay = document.getElementById("pie-overlay");
-  if (overlay) overlay.remove();
-}
+  // オーバーレイ背景クリック: 選択中なら選択解除、そうでなければ閉じる
+  overlay.onclick = (e) => {
+    const svg = document.getElementById("pie-svg");
+    if (e.target === overlay || e.target === svg) {
+      if (state.selectedChoice) {
+        state.selectedChoice = null;
+        applyPieDeselection(svg);
+      } else {
+        goBackInMenu();
+      }
+    }
+  };
 
-function ringForLevel(level) {
-  const w = 80; const gap = 6;
-  const inner = 85 + (w + gap) * (level - 1);
-  const outer = inner + w;
-  return { inner, outer };
-}
-
-let expandTimer = null;
-
-function clearOuterRings(fromLevel) {
-  const svg = document.getElementById("pie-svg");
-  if (!svg) return;
-  svg.querySelectorAll("g[data-level]").forEach((g) => {
-    if (parseInt(g.getAttribute("data-level"), 10) >= fromLevel) g.remove();
-  });
-}
-
-function syncPieControls(cx, cy) {
-  const controls = document.getElementById("pie-controls");
-  if (controls) {
-    const p = clampToViewport(cx, cy, 30);
-    controls.style.left = `${p.x}px`;
-    controls.style.top = `${p.y}px`;
-    const pieConfirm = document.getElementById("pie-confirm");
-    if (pieConfirm) pieConfirm.disabled = !state.selectedChoice;
-  }
-}
-
-function renderPieRoot(cx, cy, level1Items) {
-  ensurePieOverlay();
   const svg = document.getElementById("pie-svg");
   svg.innerHTML = "";
-  state.currentRadialMenuOrigin = { x: cx, y: cy };
-  state.currentMenuLevel = 1;
-  state.currentLevelMenuItems = level1Items;
-  state.isMenuLockedBySelection = false;
-  renderPieLevel(cx, cy, level1Items, 1);
-  syncPieControls(cx, cy);
-}
+  state.currentLevelMenuItems = items;
 
-function renderPieChildrenInWedge(cx, cy, childrenItems, level, parentStartA, parentEndA) {
-  const svg = document.getElementById("pie-svg");
-  if (!svg) return;
-  clearOuterRings(level);
-  const key = `${state.selectedInitial}|L${level}|${parentStartA.toFixed(4)}|${parentEndA.toFixed(4)}`;
-  const rng = mulberry32(state.menuSeedBase ^ hashStringToUint(key));
-  childrenItems = shuffleWithRng(childrenItems, rng);
-  const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  g.setAttribute("data-level", String(level));
-  g.style.opacity = "0"; g.style.transformOrigin = `${cx}px ${cy}px`; g.style.transform = "scale(0.92)"; g.style.transition = "opacity 120ms ease, transform 140ms ease";
-  const { inner, outer } = ringForLevel(level);
-  if (childrenItems.length === 0) return;
-  const dA = (parentEndA - parentStartA) / childrenItems.length;
-  childrenItems.forEach((item, i) => {
-    const a1 = parentStartA + dA * i, a2 = parentStartA + dA * (i + 1);
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.classList.add("pie-sector");
-    path.setAttribute("d", donutSectorPath(cx, cy, inner, outer, a1, a2));
-    if (item.type === "leaf") path.setAttribute("data-card-id", item.cardId);
-    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-    title.textContent = item.fullKimariji || item.label;
-    path.appendChild(title);
-    if (item.type === "leaf" && state.selectedChoice === item.cardId) path.classList.add("selected");
-    path.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (item.type === "leaf") {
-        handleFinalSelection(item.cardId, item.fullKimariji);
-      }
-    });
-    g.appendChild(path);
-    const midAngle = (a1 + a2) / 2, midR = (inner + outer) / 2;
-    const textPathId = `pie-text-path-${level}-${i}-${Math.random()}`;
-    const textArcPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    textArcPath.setAttribute("id", textPathId);
-    textArcPath.setAttribute("fill", "none"); textArcPath.setAttribute("stroke", "none");
-    const midPoint = polarToXY(cx, cy, midR, midAngle);
-    const isReversed = midPoint.y > cy;
-    const p1_text = polarToXY(cx, cy, midR, isReversed ? a2 : a1), p2_text = polarToXY(cx, cy, midR, isReversed ? a1 : a2);
-    const sweepFlag = isReversed ? 0 : 1;
-    textArcPath.setAttribute("d", `M ${p1_text.x} ${p1_text.y} A ${midR} ${midR} 0 0 ${sweepFlag} ${p2_text.x} ${p2_text.y}`);
-    g.appendChild(textArcPath);
-    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    if (item.type === "leaf") text.setAttribute("data-card-id", item.cardId);
-    if (item.type === "leaf" && state.selectedChoice === item.cardId) text.classList.add("selected");
-    const textPath = document.createElementNS("http://www.w3.org/2000/svg", "textPath");
-    textPath.setAttribute("href", `#${textPathId}`);
-    textPath.setAttribute("startOffset", "50%"); textPath.setAttribute("text-anchor", "middle"); textPath.setAttribute("class", "pie-label"); textPath.setAttribute("dy", "0.35em");
-    textPath.textContent = item.label;
-    text.appendChild(textPath);
-    g.appendChild(text);
-  });
-  svg.appendChild(g);
-  requestAnimationFrame(() => { g.style.opacity = "1"; g.style.transform = "scale(1)"; });
-}
+  // Center Button Group
+  const centerG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  centerG.setAttribute("class", "pie-center-group");
+  centerG.setAttribute("transform", `translate(${cx}, ${cy})`);
 
-function renderPieLevel(cx, cy, items, level) {
-  const svg = document.getElementById("pie-svg");
-  if (!svg) return;
-  clearOuterRings(level);
-  const rngOrder = mulberry32(state.menuSeedBase ^ (level * 0xA511E9B3));
-  items = shuffleWithRng(items, rngOrder);
-  const rngRot = mulberry32(state.menuSeedBase ^ (level * 0x9E3779B9));
-  const rotation = rngRot() * 2 * Math.PI;
-  const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  g.setAttribute("data-level", String(level));
-  g.style.opacity = "0"; g.style.transformOrigin = `${cx}px ${cy}px`; g.style.transform = "scale(0.92)"; g.style.transition = "opacity 120ms ease, transform 140ms ease";
-  const { inner, outer } = ringForLevel(level);
-  const n = items.length;
-  if (n === 0) return;
-  const startBase = -Math.PI / 2 + rotation;
-  const dA = (2 * Math.PI) / Math.max(1, n);
-  items.forEach((item, i) => {
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.classList.add("pie-sector");
-    let a1, a2;
-    if (n === 1) {
-      path.setAttribute("d", donutFullRingPath(cx, cy, inner, outer));
-      if (item.type === "leaf") path.setAttribute("data-card-id", item.cardId);
-      a1 = -Math.PI; a2 = Math.PI;
-    } else {
-      a1 = startBase + dA * i; a2 = a1 + dA;
-      path.setAttribute("d", donutSectorPath(cx, cy, inner, outer, a1, a2));
-      if (item.type === "leaf") path.setAttribute("data-card-id", item.cardId);
-    }
-    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-    title.textContent = item.fullKimariji || item.label;
-    path.appendChild(title);
-    if (item.type === "leaf" && state.selectedChoice === item.cardId) path.classList.add("selected");
-    path.addEventListener("mouseenter", () => {
-      if (item.type !== "branch" || state.isMenuLockedBySelection) return;
-      clearTimeout(expandTimer);
-      expandTimer = setTimeout(() => { renderPieChildrenInWedge(cx, cy, item.childrenMenuItems, level + 1, a1, a2); syncPieControls(cx, cy); }, 120);
-    });
-    path.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (item.type === "leaf") {
-        handleFinalSelection(item.cardId, item.fullKimariji);
-      }
-    });
-    g.appendChild(path);
-    if (n === 1) {
-      const tp = polarToXY(cx, cy, (inner + outer) / 2, -Math.PI / 2);
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      text.setAttribute("x", tp.x); text.setAttribute("y", tp.y); text.setAttribute("text-anchor", "middle"); text.setAttribute("dominant-baseline", "middle");
-      text.classList.add("pie-label");
-      text.textContent = item.label;
-      if (item.type === "leaf") text.setAttribute("data-card-id", item.cardId);
-      if (item.type === "leaf" && state.selectedChoice === item.cardId) text.classList.add("selected");
-      g.appendChild(text);
-    } else {
-      const midAngle = (a1 + a2) / 2, midR = (inner + outer) / 2;
-      const textPathId = `pie-text-path-${level}-${i}-${Math.random()}`;
-      const textArcPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      textArcPath.setAttribute("id", textPathId);
-      textArcPath.setAttribute("fill", "none"); textArcPath.setAttribute("stroke", "none");
-      const midPoint = polarToXY(cx, cy, midR, midAngle);
-      const isReversed = midPoint.y > cy;
-      const p1_text = polarToXY(cx, cy, midR, isReversed ? a2 : a1), p2_text = polarToXY(cx, cy, midR, isReversed ? a1 : a2);
-      const sweepFlag = isReversed ? 0 : 1;
-      textArcPath.setAttribute("d", `M ${p1_text.x} ${p1_text.y} A ${midR} ${midR} 0 0 ${sweepFlag} ${p2_text.x} ${p2_text.y}`);
-      g.appendChild(textArcPath);
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      if (item.type === "leaf") text.setAttribute("data-card-id", item.cardId);
-      if (item.type === "leaf" && state.selectedChoice === item.cardId) text.classList.add("selected");
-      const textPath = document.createElementNS("http://www.w3.org/2000/svg", "textPath");
-      textPath.setAttribute("href", `#${textPathId}`);
-      textPath.setAttribute("startOffset", "50%"); textPath.setAttribute("text-anchor", "middle"); textPath.setAttribute("class", "pie-label"); textPath.setAttribute("dy", "0.35em");
-      textPath.textContent = item.label;
-      text.appendChild(textPath);
-      g.appendChild(text);
-    }
-  });
-  svg.appendChild(g);
-  requestAnimationFrame(() => { g.style.opacity = "1"; g.style.transform = "scale(1)"; });
-}
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("r", "55");
+  circle.setAttribute("class", state.selectedChoice ? "pie-center-circle active" : "pie-center-circle back");
 
-// ==========================
-// Candidate grouping
-// ==========================
-function toLeaf(card) {
-  return { type: "leaf", label: card.kimariji, cardId: card.id, fullKimariji: card.kimariji };
-}
+  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.setAttribute("class", state.selectedChoice ? "pie-center-text active" : "pie-center-text");
+  text.textContent = state.selectedChoice ? "決定" : (parentLabel || "戻る");
 
-function groupCandidatesForFirstLevel(candidates) {
-  const groupedByPrefix = new Map();
-  candidates.forEach((card) => {
-    const key = card.kimariji.length > 1 ? card.kimariji.substring(0, 2) : card.kimariji;
-    if (!groupedByPrefix.has(key)) groupedByPrefix.set(key, []);
-    groupedByPrefix.get(key).push(card);
-  });
-  const menuItems = [];
-  groupedByPrefix.forEach((cardsInGroup, prefixLabel) => {
-    cardsInGroup.sort((a, b) => a.kimariji.localeCompare(b.kimariji, "ja"));
-    if (cardsInGroup.length === 1) {
-      menuItems.push(toLeaf(cardsInGroup[0]));
-      return;
-    }
-    menuItems.push({ type: "branch", label: prefixLabel, childrenMenuItems: cardsInGroup.map(toLeaf) });
-  });
-  return menuItems;
-}
-
-// ==========================
-// Choice screen (gojuon grid -> pie menu)
-// ==========================
-function renderChoiceScreen() {
-  state.selectionStep = 1;
-  state.currentMenuLevel = 0;
-  state.menuHistory = [];
-  state.selectedChoice = null;
-  state.selectedInitial = "";
-  state.isMenuLockedBySelection = false;
-
-  clearPieOverlay();
-
-  const step1Container = document.getElementById("choice-step-1-initials");
-  const step2Container = document.getElementById("choice-step-2-candidates");
-
-  if (step1Container) step1Container.innerHTML = "";
-  if (step2Container) {
-    step2Container.className = "choice-step";
-    step2Container.innerHTML = "";
-  }
-
-  if (step1Container) step1Container.className = "choice-step active gojuon-grid";
-
-  const gojuon = [ "わ","ら","や","ま","は","な","た","さ","か","あ", "を","り"," ","み","ひ","に","ち","し","き","い", "ん","る","ゆ","む","ふ","ぬ","つ","す","く","う", " ","れ"," ","め","へ","ね","て","せ","け","え", " ","ろ","よ","も","ほ","の","と","そ","こ","お" ];
-  const validInitials = new Set(state.cardData.map((c) => c.kimariji.charAt(0)));
-
-  gojuon.forEach((char) => {
-    const btn = document.createElement("button");
-    btn.className = "choice-btn initial-btn";
-    if (char === " ") {
-      btn.classList.add("placeholder");
-      btn.disabled = true;
-    } else {
-      btn.textContent = char;
-      if (validInitials.has(char)) {
-        btn.onclick = (e) => handleInitialClick(char, e);
-      } else {
-        btn.classList.add("disabled");
-        btn.disabled = true;
-      }
-    }
-    step1Container?.appendChild(btn);
-  });
-}
-
-function handleInitialClick(initial, event) {
-  state.selectionStep = 2;
-  state.selectedInitial = initial;
-  state.selectedChoice = null;
-  state.isMenuLockedBySelection = false;
-
-  const candidates = state.cardData.filter((c) => c.kimariji.startsWith(initial));
-  candidates.sort((a, b) => a.kimariji.localeCompare(b.kimariji, "ja"));
-  let menuItems = groupCandidatesForFirstLevel(candidates);
-
-  const rng1 = mulberry32(state.menuSeedBase ^ 0xA1B2C3D4);
-  menuItems = shuffleWithRng(menuItems, rng1);
-
-  // Clamp the pie menu center to the viewport
-  const maxRadius = 350; // A safe estimate for padding
-  const clampedCenter = clampToViewport(event.clientX, event.clientY, maxRadius);
-
-  renderPieRoot(clampedCenter.x, clampedCenter.y, menuItems);
-  state.menuHistory = [{ level: 0 }];
-}
-
-function handleFinalSelection(cardId, fullKimariji) {
-  // If clicking the same item, deselect it. Otherwise, select the new one.
-  if (state.selectedChoice === cardId) {
-    state.selectedChoice = null;
-  } else {
-    state.selectedChoice = cardId;
-  }
-
-  // Update selection style on all items without re-rendering
-  document.querySelectorAll('.pie-sector[data-card-id], .pie-label[data-card-id]').forEach(el => {
-    const elCardId = parseInt(el.getAttribute('data-card-id'), 10);
-    if (elCardId === state.selectedChoice) {
-      el.classList.add('selected');
-    } else {
-      el.classList.remove('selected');
-    }
-  });
-  
-  state.isMenuLockedBySelection = !!state.selectedChoice;
-
-  const confirmEnabled = !!state.selectedChoice;
-  const pieConfirm = document.getElementById("pie-confirm");
-  if (pieConfirm) pieConfirm.disabled = !confirmEnabled;
-}
-
-function goBackInMenu() {
-  state.isMenuLockedBySelection = false;
-  state.selectedChoice = null;
-  clearPieOverlay();
-  renderChoiceScreen();
-}
-
-function confirmChoice() {
-  if (!state.selectedChoice) return;
-  state.isMenuLockedBySelection = false;
-  clearPieOverlay();
-  const resultData = {
-    participant_id: state.participantId,
-    timestamp: new Date().toISOString(),
-    stimulus_id: state.currentTrialData.stimulus_id,
-    stimulus_file: state.currentTrialData.stimulus_file,
-    repetition: state.currentTrialData.rep,
-    trial_index: state.currentTrialData.trial_index,
-    rt_ms: state.currentTrialData.press_time,
-    rt_prime_ms: state.currentTrialData.t_prime,
-    input_device: state.currentTrialData.input_device,
-    choice_id: state.selectedChoice,
-    is_correct: state.selectedChoice === state.currentTrialData.stimulus_id ? 1 : 0,
-    t_answer_ms: performance.now()
+  centerG.onclick = (e) => {
+    e.stopPropagation();
+    if (state.selectedChoice) confirmChoice(); else goBackInMenu();
   };
-  state.mainResults.push(resultData);
-  state.unsentTrialResults.push(resultData);
-  state.currentMenuLevel = 0;
-  state.menuHistory = [];
-  state.selectedChoice = null;
+
+  centerG.appendChild(circle);
+  centerG.appendChild(text);
+  svg.appendChild(centerG);
+  renderPieLevel(cx, cy, items, 1);
+}
+
+function renderPieLevel(cx, cy, items, level, startA = -Math.PI/2, span = 2*Math.PI) {
+  const svg = document.getElementById("pie-svg");
+
+  // このレベル以降の既存要素を削除（別ブランチへの移動時にクリア）
+  svg.querySelectorAll('[data-pie-level]').forEach(el => {
+    if (parseInt(el.getAttribute('data-pie-level')) >= level) el.remove();
+  });
+
+  const inner = 60 + (85 * (level-1)), outer = inner + 80;
+  const rng = mulberry32(state.menuSeedBase + level);
+  const rotatedItems = shuffleWithRng(items, rng);
+  // レベル1（全円）のみランダム回転。サブレベルは回転なし（親セクター内に収める）
+  const rotation = level === 1 ? (rng() * 2 * Math.PI) : 0;
+
+  const dA = span / items.length;
+  rotatedItems.forEach((item, i) => {
+    const a1 = startA + rotation + (dA * i), a2 = a1 + dA;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("class", "pie-sector" + (state.selectedChoice === item.cardId ? " selected" : ""));
+    path.setAttribute("d", donutPath(cx, cy, inner, outer, a1, a2));
+    path.setAttribute("data-pie-level", level);
+    if (item.type === "leaf") path.setAttribute("data-card-id", item.cardId);
+
+    path.onmouseenter = () => {
+      if (state.selectedChoice) return; // 選択中はホバーで変えない
+      if (item.type === "branch") renderPieLevel(cx, cy, item.children, level + 1, a1, dA);
+      else {
+        svg.querySelectorAll('[data-pie-level]').forEach(el => {
+          if (parseInt(el.getAttribute('data-pie-level')) > level) el.remove();
+        });
+      }
+    };
+    path.onclick = (e) => {
+      e.stopPropagation();
+      if (item.type === "leaf") {
+        state.selectedChoice = item.cardId;
+        applyPieSelection(svg);  // SVGを消さず色だけ更新
+      }
+    };
+
+    const mid = (a1 + a2) / 2;
+    const pos = polarToXY(cx, cy, (inner + outer) / 2, mid);
+    const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    txt.setAttribute("x", pos.x); txt.setAttribute("y", pos.y);
+    txt.setAttribute("text-anchor", "middle"); txt.setAttribute("dominant-baseline", "central");
+    txt.setAttribute("class", "pie-label" + (state.selectedChoice === item.cardId ? " selected" : ""));
+    txt.setAttribute("data-pie-level", level);
+    if (item.type === "leaf") txt.setAttribute("data-card-id", item.cardId);
+    txt.textContent = item.label;
+    
+    svg.appendChild(path);
+    svg.appendChild(txt);
+  });
+}
+
+function renderChoiceScreen() {
+  const container = document.getElementById("choice-step-1-initials");
+  container.innerHTML = "";
+  container.classList.add("gojuon-grid");
+  const gojuon = ["わ","ら","や","ま","は","な","た","さ","か","あ","を","り"," ","み","ひ","に","ち","し","き","い","ん","る","ゆ","む","ふ","ぬ","つ","す","く","う"," ","れ"," ","め","へ","ね","て","せ","け","え"," ","ろ","よ","も","ほ","の","と","そ","こ","お"];
+  const valid = new Set(state.cardData.map(c => c.kimariji[0]));
+  gojuon.forEach(char => {
+    const btn = document.createElement("button"); btn.className = "choice-btn initial-btn";
+    if (char === " ") btn.style.visibility = "hidden";
+    else {
+      btn.textContent = char;
+      if (valid.has(char)) btn.onclick = (e) => {
+        const cards = state.cardData.filter(c => c.kimariji.startsWith(char));
+        const items = groupCandidates(cards);
+        if (items.length === 1 && items[0].type === 'leaf') {
+          // 一字決まり: 選択状態にしつつ、円形メニューも表示して何を選択したか見えるようにする
+          state.selectedChoice = items[0].cardId;
+        }
+        renderPieRoot(e.clientX, e.clientY, items);
+      };
+      else btn.disabled = true;
+    }
+    container.appendChild(btn);
+  });
+}
+
+function groupCandidates(cards) {
+  const map = new Map();
+  cards.forEach(c => {
+    const k = c.kimariji.length > 1 ? c.kimariji.substring(0,2) : c.kimariji;
+    if (!map.has(k)) map.set(k, []); map.get(k).push(c);
+  });
+  return Array.from(map.entries()).map(([k, v]) => {
+    if (v.length === 1) return { type: "leaf", label: v[0].kimariji, cardId: v[0].id };
+    return { type: "branch", label: k, children: v.map(c => ({ type: "leaf", label: c.kimariji, cardId: c.id })) };
+  });
+}
+function confirmChoice() {
+  const decision_time = performance.now() - state.currentTrialData.t_press_absolute;
+  const res = { ...state.currentTrialData, choice_id: state.selectedChoice, is_correct: state.selectedChoice === state.currentTrialData.stimulus_id ? 1 : 0, t_answer: Math.round(decision_time) };
+  state.mainResults.push(res);
+  // 試行ごとに即時保存
+  postToGoogleSheet({
+    type: 'trial_single',
+    data: { participant_id: state.participantId, session_timestamp: state.sessionTimestamp, random_seed: state.participantSeed, is_test_mode: state.isTestMode, t_motor: state.t_motor, userAgent: navigator.userAgent, ...res }
+  });
   state.currentTrialIndex++;
+  const o = document.getElementById("pie-overlay"); if(o) o.remove();
   nextMainTrial();
 }
+function goBackInMenu() { state.selectedChoice = null; const o = document.getElementById("pie-overlay"); if(o) o.remove(); }
 
 // ==========================
-// Finish + export
+// Finalization
 // ==========================
+async function sendBatchToGoogleSheet() {
+  if (state.unsavedResults.length === 0) return;
+  const data = state.unsavedResults.splice(0);
+  postToGoogleSheet({
+    type: 'trials_batch',
+    data: data.map(t => ({ participant_id: state.participantId, session_timestamp: state.sessionTimestamp, is_test_mode: state.isTestMode, t_motor: state.t_motor, userAgent: navigator.userAgent, ...t }))
+  });
+}
 function finishExperiment() {
-  state.phase = "finished";
-  showScreen("results");
-  
-  if (state.unsentTrialResults.length > 0) {
-    sendDataToSheet('trials_batch', state.unsentTrialResults);
-    state.unsentTrialResults = [];
-  }
-
-  const validTrials = state.mainResults.filter((t) => t.press_time > 0);
-  const correctTrials = validTrials.filter((t) => t.is_correct);
-  const t_primes = validTrials.map((t) => t.rt_prime_ms).sort((a, b) => a - b);
-  let S = 0;
-  if (t_primes.length > 0) {
-    const mid = Math.floor(t_primes.length / 2);
-    S = t_primes.length % 2 !== 0 ? t_primes[mid] : (t_primes[mid - 1] + t_primes[mid]) / 2;
-  }
-  const A = validTrials.length > 0 ? correctTrials.length / validTrials.length : 0;
-  const meanCorrect = correctTrials.length > 0 ? correctTrials.reduce((s, t) => s + t.rt_prime_ms, 0) / correctTrials.length : 0;
-  const incorrect = validTrials.filter((t) => !t.is_correct);
-  const meanIncorrect = incorrect.length > 0 ? incorrect.reduce((s, t) => s + t.rt_prime_ms, 0) / incorrect.length : 0;
-  const Delta = meanIncorrect - meanCorrect;
-
-  state.summaryStats = { Summary_Speed_S_ms: S, Summary_Accuracy_A_percent: A * 100, Summary_Risk_Delta_ms: Delta };
-
-  const summaryDataForSheet = {
-    timestamp: new Date().toISOString(),
-    participantId: state.participantId,
-    inputDevice: state.inputDevice,
-    t_motor: state.t_motor,
-    ...state.summaryStats
-  };
-  sendDataToSheet('summary', summaryDataForSheet);
-
-  const statsHTML = `<h3>概要統計</h3>
-    <p><strong>運動反応時間 (t_motor):</strong> ${state.t_motor.toFixed(2)} ms</p>
-    <p><strong>速度 (S):</strong> ${S.toFixed(2)} ms</p>
-    <p><strong>正確度 (A):</strong> ${(A * 100).toFixed(1)} %</p>
-    <p><strong>リスク指標 (Delta):</strong> ${Delta.toFixed(2)} ms</p>`;
-  let container = document.getElementById("results-stats");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "results-stats";
-    document.getElementById("screen-results")?.insertBefore(container, document.getElementById("btn-download-logs"));
-  }
-  if (container) container.innerHTML = statsHTML;
-}
-
-function convertToCSV(data) {
-  if (data.length === 0) return "";
-  const headers = Object.keys(data[0]);
-  const csvRows = [headers.join(",")];
-  for (const row of data) {
-    const values = headers.map((header) => {
-      let value = String(row[header] ?? "");
-      if (value.includes(",")) value = `"${value}"`;
-      return value;
-    });
-    csvRows.push(values.join(","));
-  }
-  return csvRows.join("\n");
-}
-
-function downloadLogs() {
-  const metaData = {
-    participantId: state.participantId,
-    inputDevice: state.inputDevice,
-    date: new Date().toISOString(),
-    userAgent: navigator.userAgent,
-    experimentVersion: "1.0",
-    t_motor: state.t_motor
-  };
-  const flattenedMainTrials = state.mainResults.map((trial) => ({ ...metaData, ...(state.summaryStats || {}), ...trial }));
-  const csvContent = convertToCSV(flattenedMainTrials);
-  if (!csvContent) {
-    return;
-  }
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `kikiwake_main_${state.participantId}_${Date.now()}.csv`;
-  a.click();
-}
-
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
+  sendBatchToGoogleSheet(); showScreen("results");
+  const valid = state.mainResults.filter(t => t.press_time > 0);
+  const correct = valid.filter(t => t.is_correct);
+  const t_primes = valid.map(t => t.t_prime).sort((a,b) => a-b);
+  let S = 0; if (t_primes.length > 0) { const mid = Math.floor(t_primes.length/2); S = t_primes.length%2!==0 ? t_primes[mid] : (t_primes[mid-1]+t_primes[mid])/2; }
+  postToGoogleSheet({ type: 'summary', data: { participant_id: state.participantId, session_timestamp: state.sessionTimestamp, is_test_mode: state.isTestMode, Summary_Speed_S_ms: S, Summary_Accuracy_A_percent: (correct.length/(valid.length||1))*100 } });
 }
 
 // ==========================
@@ -943,45 +562,56 @@ function shuffle(array) {
 // ==========================
 async function init() {
   try {
-    const [manifestRes, kimarijiRes] = await Promise.all([fetch("manifest.json"), fetch("kimariji.json")]);
-    state.manifest = await manifestRes.json();
-    state.kimarijiData = await kimarijiRes.json();
-  } catch (e) {
-    console.error("Failed to load data files", e);
-    alert("致命的なエラー: データファイルの読み込みに失敗しました。");
-  }
-
-  document.getElementById("btn-start-motor")?.addEventListener("click", startMotorPhase);
-  document.getElementById("btn-start-calibration")?.addEventListener("click", () => {
-    const b = document.getElementById("btn-start-calibration");
-    const area = document.getElementById("motor-area");
-    if (b) b.style.display = "none";
-    if (area) area.style.display = "flex";
-    nextMotorTrial();
-  });
-
-  document.getElementById("btn-start-main")?.addEventListener("click", startMainPhase);
-  document.getElementById("press-button")?.addEventListener("mousedown", handlePress);
-  document.getElementById("motor-area")?.addEventListener("mousedown", handlePress);
-  
-  document.getElementById("btn-resume")?.addEventListener("click", resumeFromBreak);
-  document.getElementById("btn-download-logs")?.addEventListener("click", downloadLogs);
-  document.getElementById("test-mode-toggle")?.addEventListener("change", (e) => { state.isTestMode = e.target.checked; });
-
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "Space" && (state.phase === "motor_waiting" || state.phase === "main_listening")) {
+    const [m, k] = await Promise.all([fetch(BASE_PATH + "manifest.json").then(r => r.json()), fetch(BASE_PATH + "kimariji.json").then(r => r.json())]);
+    state.manifest = m; state.kimarijiData = k;
+  } catch(e){}
+  document.getElementById("btn-start-motor").onclick = startMotorPhase;
+  document.getElementById("btn-start-calibration").onclick = () => {
+    document.getElementById("btn-start-calibration").style.display = "none";
+    document.getElementById("motor-area").style.display = "flex";
+    // 最初の試行の前に少し待つ
+    setTimeout(nextMotorTrial, 1000);
+  };
+  document.getElementById("btn-start-main").onclick = startMainPhase;
+  document.getElementById("btn-resume").onclick = () => nextMainTrial(true);
+  document.getElementById("motor-area").onclick = handlePress;
+  document.getElementById("press-button").onclick = handlePress;
+  document.getElementById("btn-unknown-global").onclick = () => {
+    // わからない回答をGASに保存
+    const t_unknown = state.currentTrialData.t_press_absolute
+      ? Math.round(performance.now() - state.currentTrialData.t_press_absolute)
+      : null;
+    const unknownRes = {
+      ...state.currentTrialData,
+      choice_id: null,
+      is_correct: 0,
+      is_unknown: 1,
+      t_answer: t_unknown
+    };
+    postToGoogleSheet({
+      type: 'trial_single',
+      data: { participant_id: state.participantId, session_timestamp: state.sessionTimestamp, random_seed: state.participantSeed, is_test_mode: state.isTestMode, t_motor: state.t_motor, userAgent: navigator.userAgent, ...unknownRes }
+    });
+    // 刺激情報のみをコピーしてデッキ末尾に追加（タイミングデータは除く）
+    state.trialDeck.push({
+      stimulus_id: state.currentTrialData.stimulus_id,
+      stimulus_file: state.currentTrialData.stimulus_file,
+      rep: state.currentTrialData.rep,
+      kimariji: state.currentTrialData.kimariji,
+      trial_index: state.currentTrialData.trial_index
+    });
+    state.currentTrialIndex++;
+    const o = document.getElementById("pie-overlay"); if(o) o.remove();
+    nextMainTrial();
+  };
+  document.getElementById("test-mode-toggle").onchange = (e) => state.isTestMode = e.target.checked;
+  window.onkeydown = (e) => {
+    if (e.code === "Space" && (state.phase === "motor_waiting" || state.phase === "main_listening")) { e.preventDefault(); handlePress(e); }
+    if (e.code === "Escape" && document.getElementById("pie-overlay")) {
       e.preventDefault();
-      handlePress(e);
+      if (state.selectedChoice) { state.selectedChoice = null; applyPieDeselection(document.getElementById("pie-svg")); }
+      else goBackInMenu();
     }
-    if (e.code === "Escape" && state.phase === "main_choosing") {
-      if (!state.isMenuLockedBySelection) {
-        clearPieOverlay();
-        goBackInMenu();
-      }
-    }
-  });
-
-  requestAnimationFrame(gamepadLoop);
+  };
 }
-
 init();

@@ -30,48 +30,12 @@ body {
 .screen.active { display: block; animation: fadeIn 0.5s; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* --- Gojuon Grid Styles --- */
-.choice-step.gojuon-grid {
-    display: grid;
-    grid-template-columns: repeat(10, 1fr);
-    gap: 5px;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-}
-.gojuon-grid .initial-btn {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    font-size: 1.1em;
-    background-color: #ffffff;
-    color: #111111;
-    border: 2px solid #444444;
-    font-weight: 600;
-}
-.gojuon-grid .initial-btn:not(.placeholder):not([disabled]) {
-    color: #003a80;
-}
-.gojuon-grid .initial-btn:hover {
-    background-color: #e6f2ff;
-    border-color: #005fcc;
-}
-.gojuon-grid .initial-btn.disabled {
-    background-color: #eeeeee;
-    color: #aaaaaa;
-    border-color: #dddddd;
-    cursor: not-allowed;
-}
-.gojuon-grid .placeholder { visibility: hidden; }
-
-/* --- General button and form styles --- */
 .form-group { margin-bottom: 15px; }
 .form-group label { display: block; margin-bottom: 5px; }
-.form-group input[type="text"], .form-group select {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+#participant-id {
+    text-transform: lowercase;
 }
+
 button {
     padding: 10px 20px;
     font-size: 1em;
@@ -103,90 +67,145 @@ button:disabled { background-color: #ccc; }
     border-radius: 8px;
     padding: 20px;
 }
-#btn-start-calibration { padding: 20px 40px; font-size: 1.2em; }
+#btn-start-calibration, #btn-start-main {
+    padding: 25px 50px;
+    font-size: 1.5em;
+    font-weight: bold;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    transition: transform 0.1s, background-color 0.2s;
+}
+#btn-start-calibration:hover, #btn-start-main:hover {
+    background-color: #218838;
+    transform: translateY(-2px);
+}
+#btn-start-calibration:active, #btn-start-main:active {
+    transform: translateY(0);
+}
+
+#motor-area-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+    background-color: #f8f9fa;
+    border: 2px solid #dee2e6;
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+}
+.motor-guide-text {
+    font-size: 1.2em;
+    color: #495057;
+    margin-bottom: 20px;
+}
 #motor-area {
+    background-color: #e0e0e0;
+    border-radius: 8px;
+    min-height: 150px;
     width: 100%;
-    height: 100%;
-    min-height: 300px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    border: 3px solid #aaa;
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    background-color: #dcdcdc;
-    border: 2px dashed #aaaaaa;
-    border-radius: 8px;
+    text-align: center;
 }
-#motor-area.responded { background-color: #a8d58c; }
+/* 押した瞬間は即時緑（transitionなし）、戻る時はゆっくりフェード */
+#motor-area.responded { background-color: #5cb85c; border-color: #3d8b3d; transition: none; }
 #motor-area p { font-size: 1.5em; color: #333; user-select: none; }
+
+/* --- Gojuon Grid Styles --- */
+.choice-step.gojuon-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 5px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+.initial-btn {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    font-size: 1.1em;
+    background-color: #ffffff;
+    color: #111111;
+    border: 2px solid #444444;
+    font-weight: 600;
+}
+.initial-btn:hover:not([disabled]) {
+    background-color: #e6f2ff;
+    border-color: #005fcc;
+}
+.initial-btn.disabled {
+    background-color: #eeeeee;
+    color: #aaaaaa;
+    border-color: #dddddd;
+    cursor: not-allowed;
+}
+.initial-btn.placeholder { visibility: hidden; }
+
 
 /* --- Pie Menu --- */
 .pie-overlay{
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.3);
   z-index: 1000;
-  pointer-events: none;
 }
 .pie-svg{
-  position: absolute;
-  left: 0; top: 0;
   width: 100vw;
   height: 100vh;
-  pointer-events: none;
+  display: block;
 }
 .pie-sector{
-  pointer-events: auto;
-  stroke: #111;
+  fill: #ffffff;
+  stroke: #333;
   stroke-width: 2;
-  fill: #fff;
   cursor: pointer;
-  transition: fill 0.1s ease;
+  transition: fill 0.1s;
 }
-.pie-sector:hover, .pie-sector.active{
-  fill: #e6f2ff;
-  stroke: #005fcc;
-}
-.pie-sector.selected{
-  fill: #005fcc;
-  stroke: #003a80;
-}
-.pie-label{
-  font-size: 16px;
-  font-weight: 700;
-  fill: #111;
-  user-select: none;
+.pie-sector:hover { fill: #f0f7ff; }
+.pie-sector.selected { fill: #007bff; stroke: #0056b3; }
+.pie-label {
+  font-size: 14px;
+  font-weight: bold;
   pointer-events: none;
+  user-select: none;
 }
-.pie-label.selected{
-  fill: #fff;
+.pie-label.selected { fill: white; }
+
+/* 中央の決定・戻るボタン */
+.pie-center-group { cursor: pointer; }
+.pie-center-circle { fill: #ffffff; stroke: #333; stroke-width: 3; }
+.pie-center-circle.active { fill: #28a745; stroke: #1e7e34; }
+.pie-center-circle.back { fill: #f8f9fa; }
+.pie-center-text {
+  font-size: 18px;
+  font-weight: 800;
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: central;
 }
-.pie-controls{
-  position: absolute;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-  z-index: 1001;
-  display: flex;
-  gap: 10px;
-  background: rgba(255,255,255,0.92);
-  border: 2px solid #333;
-  border-radius: 999px;
-  padding: 10px 12px;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+.pie-center-text.active { fill: white; }
+
+/* Loader */
+.loader {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #3498db;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 2s linear infinite;
+    margin: 20px auto;
 }
-.pie-controls button{
-  background: #005fcc;
-  color: #fff;
-  border: 2px solid #003a80;
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-weight: 700;
-}
-.pie-controls button:disabled{
-  background: #bbb;
-  border-color: #999;
-  color: #555;
-  cursor: not-allowed;
-}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
 
 #results-stats {
     font-size: 16px;
