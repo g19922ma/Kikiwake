@@ -585,8 +585,8 @@ async function init() {
       ...state.currentTrialData,
       choice_id: null,
       is_correct: 0,
-      is_unknown: 1,
-      t_answer: t_unknown
+      t_answer: t_unknown,
+      is_unknown: 1
     };
     postToGoogleSheet({
       type: 'trial_single',
