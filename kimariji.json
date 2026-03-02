@@ -1,402 +1,606 @@
-[
-  {
-    "id": 1,
-    "kimariji": "あきの"
-  },
-  {
-    "id": 2,
-    "kimariji": "はるす"
-  },
-  {
-    "id": 3,
-    "kimariji": "あし"
-  },
-  {
-    "id": 4,
-    "kimariji": "たご"
-  },
-  {
-    "id": 5,
-    "kimariji": "おく"
-  },
-  {
-    "id": 6,
-    "kimariji": "かさ"
-  },
-  {
-    "id": 7,
-    "kimariji": "あまの"
-  },
-  {
-    "id": 8,
-    "kimariji": "わがゐ"
-  },
-  {
-    "id": 9,
-    "kimariji": "はなの"
-  },
-  {
-    "id": 10,
-    "kimariji": "これ"
-  },
-  {
-    "id": 11,
-    "kimariji": "わたのはらや"
-  },
-  {
-    "id": 12,
-    "kimariji": "あまつ"
-  },
-  {
-    "id": 13,
-    "kimariji": "つく"
-  },
-  {
-    "id": 14,
-    "kimariji": "みち"
-  },
-  {
-    "id": 15,
-    "kimariji": "きみがためは"
-  },
-  {
-    "id": 16,
-    "kimariji": "たち"
-  },
-  {
-    "id": 17,
-    "kimariji": "ちは"
-  },
-  {
-    "id": 18,
-    "kimariji": "す"
-  },
-  {
-    "id": 19,
-    "kimariji": "なにわが"
-  },
-  {
-    "id": 20,
-    "kimariji": "わび"
-  },
-  {
-    "id": 21,
-    "kimariji": "いまこ"
-  },
-  {
-    "id": 22,
-    "kimariji": "ふ"
-  },
-  {
-    "id": 23,
-    "kimariji": "つき"
-  },
-  {
-    "id": 24,
-    "kimariji": "この"
-  },
-  {
-    "id": 25,
-    "kimariji": "なにし"
-  },
-  {
-    "id": 26,
-    "kimariji": "おぐ"
-  },
-  {
-    "id": 27,
-    "kimariji": "みかの"
-  },
-  {
-    "id": 28,
-    "kimariji": "やまざ"
-  },
-  {
-    "id": 29,
-    "kimariji": "こころあ"
-  },
-  {
-    "id": 30,
-    "kimariji": "ありあ"
-  },
-  {
-    "id": 31,
-    "kimariji": "あさぼらけあ"
-  },
-  {
-    "id": 32,
-    "kimariji": "やまが"
-  },
-  {
-    "id": 33,
-    "kimariji": "ひさ"
-  },
-  {
-    "id": 34,
-    "kimariji": "たれ"
-  },
-  {
-    "id": 35,
-    "kimariji": "ひとは"
-  },
-  {
-    "id": 36,
-    "kimariji": "なつ"
-  },
-  {
-    "id": 37,
-    "kimariji": "しら"
-  },
-  {
-    "id": 38,
-    "kimariji": "わすら"
-  },
-  {
-    "id": 39,
-    "kimariji": "あさじ"
-  },
-  {
-    "id": 40,
-    "kimariji": "しの"
-  },
-  {
-    "id": 41,
-    "kimariji": "こい"
-  },
-  {
-    "id": 42,
-    "kimariji": "ちぎりき"
-  },
-  {
-    "id": 43,
-    "kimariji": "あい"
-  },
-  {
-    "id": 44,
-    "kimariji": "おおこ"
-  },
-  {
-    "id": 45,
-    "kimariji": "あはれ"
-  },
-  {
-    "id": 46,
-    "kimariji": "ゆら"
-  },
-  {
-    "id": 47,
-    "kimariji": "やえ"
-  },
-  {
-    "id": 48,
-    "kimariji": "かぜを"
-  },
-  {
-    "id": 49,
-    "kimariji": "みかき"
-  },
-  {
-    "id": 50,
-    "kimariji": "きみがためお"
-  },
-  {
-    "id": 51,
-    "kimariji": "かく"
-  },
-  {
-    "id": 52,
-    "kimariji": "あけ"
-  },
-  {
-    "id": 53,
-    "kimariji": "なげき"
-  },
-  {
-    "id": 54,
-    "kimariji": "わすれ"
-  },
-  {
-    "id": 55,
-    "kimariji": "たき"
-  },
-  {
-    "id": 56,
-    "kimariji": "あらざ"
-  },
-  {
-    "id": 57,
-    "kimariji": "め"
-  },
-  {
-    "id": 58,
-    "kimariji": "ありま"
-  },
-  {
-    "id": 59,
-    "kimariji": "やす"
-  },
-  {
-    "id": 60,
-    "kimariji": "おおえ"
-  },
-  {
-    "id": 61,
-    "kimariji": "いに"
-  },
-  {
-    "id": 62,
-    "kimariji": "よを"
-  },
-  {
-    "id": 63,
-    "kimariji": "いまは"
-  },
-  {
-    "id": 64,
-    "kimariji": "あさぼらけう"
-  },
-  {
-    "id": 65,
-    "kimariji": "うら"
-  },
-  {
-    "id": 66,
-    "kimariji": "もろ"
-  },
-  {
-    "id": 67,
-    "kimariji": "はるの"
-  },
-  {
-    "id": 68,
-    "kimariji": "こころに"
-  },
-  {
-    "id": 69,
-    "kimariji": "あらし"
-  },
-  {
-    "id": 70,
-    "kimariji": "さ"
-  },
-  {
-    "id": 71,
-    "kimariji": "ゆう"
-  },
-  {
-    "id": 72,
-    "kimariji": "おと"
-  },
-  {
-    "id": 73,
-    "kimariji": "たか"
-  },
-  {
-    "id": 74,
-    "kimariji": "うか"
-  },
-  {
-    "id": 75,
-    "kimariji": "ちぎりお"
-  },
-  {
-    "id": 76,
-    "kimariji": "わたのはらこ"
-  },
-  {
-    "id": 77,
-    "kimariji": "せ"
-  },
-  {
-    "id": 78,
-    "kimariji": "あはじ"
-  },
-  {
-    "id": 79,
-    "kimariji": "あきか"
-  },
-  {
-    "id": 80,
-    "kimariji": "ながか"
-  },
-  {
-    "id": 81,
-    "kimariji": "ほ"
-  },
-  {
-    "id": 82,
-    "kimariji": "おも"
-  },
-  {
-    "id": 83,
-    "kimariji": "よのなかよ"
-  },
-  {
-    "id": 84,
-    "kimariji": "ながら"
-  },
-  {
-    "id": 85,
-    "kimariji": "よも"
-  },
-  {
-    "id": 86,
-    "kimariji": "なげけ"
-  },
-  {
-    "id": 87,
-    "kimariji": "む"
-  },
-  {
-    "id": 88,
-    "kimariji": "なにわえ"
-  },
-  {
-    "id": 89,
-    "kimariji": "たま"
-  },
-  {
-    "id": 90,
-    "kimariji": "みせ"
-  },
-  {
-    "id": 91,
-    "kimariji": "きり"
-  },
-  {
-    "id": 92,
-    "kimariji": "わがそ"
-  },
-  {
-    "id": 93,
-    "kimariji": "よのなかは"
-  },
-  {
-    "id": 94,
-    "kimariji": "みよ"
-  },
-  {
-    "id": 95,
-    "kimariji": "おおけ"
-  },
-  {
-    "id": 96,
-    "kimariji": "はなさ"
-  },
-  {
-    "id": 97,
-    "kimariji": "こぬ"
-  },
-  {
-    "id": 98,
-    "kimariji": "かぜそ"
-  },
-  {
-    "id": 99,
-    "kimariji": "ひとも"
-  },
-  {
-    "id": 100,
-    "kimariji": "もも"
-  }
-]
+{
+  "cue_speech_end_inaba": 8.025,
+  "cue_speech_end_kimoto": 8.469,
+  "kimariji": [
+    {
+      "id": 1,
+      "kimariji": "あきの",
+      "onset_inaba": 0.054,
+      "onset_kimoto": 0.577
+    },
+    {
+      "id": 2,
+      "kimariji": "はるす",
+      "onset_inaba": 0.086,
+      "onset_kimoto": 0.766
+    },
+    {
+      "id": 3,
+      "kimariji": "あし",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 0.524
+    },
+    {
+      "id": 4,
+      "kimariji": "たご",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 0.452
+    },
+    {
+      "id": 5,
+      "kimariji": "おく",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 0.491
+    },
+    {
+      "id": 6,
+      "kimariji": "かさ",
+      "onset_inaba": 0.05,
+      "onset_kimoto": 0.546
+    },
+    {
+      "id": 7,
+      "kimariji": "あまの",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 0.282
+    },
+    {
+      "id": 8,
+      "kimariji": "わがゐ",
+      "onset_inaba": 0.054,
+      "onset_kimoto": 0.906
+    },
+    {
+      "id": 9,
+      "kimariji": "はなの",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 1.165
+    },
+    {
+      "id": 10,
+      "kimariji": "これ",
+      "onset_inaba": 0.054,
+      "onset_kimoto": 0.836
+    },
+    {
+      "id": 11,
+      "kimariji": "わたのはらや",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.206
+    },
+    {
+      "id": 12,
+      "kimariji": "あまつ",
+      "onset_inaba": 0.061,
+      "onset_kimoto": 0.724
+    },
+    {
+      "id": 13,
+      "kimariji": "つく",
+      "onset_inaba": 0.051,
+      "onset_kimoto": 0.777
+    },
+    {
+      "id": 14,
+      "kimariji": "みち",
+      "onset_inaba": 0.058,
+      "onset_kimoto": 0.687
+    },
+    {
+      "id": 15,
+      "kimariji": "きみがためは",
+      "onset_inaba": 0.053,
+      "onset_kimoto": 0.481
+    },
+    {
+      "id": 16,
+      "kimariji": "たち",
+      "onset_inaba": 0.054,
+      "onset_kimoto": 0.322
+    },
+    {
+      "id": 17,
+      "kimariji": "ちは",
+      "onset_inaba": 0.057,
+      "onset_kimoto": 1.052
+    },
+    {
+      "id": 18,
+      "kimariji": "す",
+      "onset_inaba": 0.064,
+      "onset_kimoto": 0.879
+    },
+    {
+      "id": 19,
+      "kimariji": "なにわが",
+      "onset_inaba": 0.054,
+      "onset_kimoto": 0.735
+    },
+    {
+      "id": 20,
+      "kimariji": "わび",
+      "onset_inaba": 0.058,
+      "onset_kimoto": 0.576
+    },
+    {
+      "id": 21,
+      "kimariji": "いまこ",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 1.082
+    },
+    {
+      "id": 22,
+      "kimariji": "ふ",
+      "onset_inaba": 0.079,
+      "onset_kimoto": 0.934
+    },
+    {
+      "id": 23,
+      "kimariji": "つき",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 1.016
+    },
+    {
+      "id": 24,
+      "kimariji": "この",
+      "onset_inaba": 0.057,
+      "onset_kimoto": 0.853
+    },
+    {
+      "id": 25,
+      "kimariji": "なにし",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 0.834
+    },
+    {
+      "id": 26,
+      "kimariji": "おぐ",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 0.41
+    },
+    {
+      "id": 27,
+      "kimariji": "みかの",
+      "onset_inaba": 0.053,
+      "onset_kimoto": 0.526
+    },
+    {
+      "id": 28,
+      "kimariji": "やまざ",
+      "onset_inaba": 0.057,
+      "onset_kimoto": 0.957
+    },
+    {
+      "id": 29,
+      "kimariji": "こころあ",
+      "onset_inaba": 0.051,
+      "onset_kimoto": 0.789
+    },
+    {
+      "id": 30,
+      "kimariji": "ありあ",
+      "onset_inaba": 0.058,
+      "onset_kimoto": 1.326
+    },
+    {
+      "id": 31,
+      "kimariji": "あさぼらけあ",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 1.429
+    },
+    {
+      "id": 32,
+      "kimariji": "やまが",
+      "onset_inaba": 0.058,
+      "onset_kimoto": 0.782
+    },
+    {
+      "id": 33,
+      "kimariji": "ひさ",
+      "onset_inaba": 0.076,
+      "onset_kimoto": 0.984
+    },
+    {
+      "id": 34,
+      "kimariji": "たれ",
+      "onset_inaba": 0.052,
+      "onset_kimoto": 1.198
+    },
+    {
+      "id": 35,
+      "kimariji": "ひとは",
+      "onset_inaba": 0.054,
+      "onset_kimoto": 1.258
+    },
+    {
+      "id": 36,
+      "kimariji": "なつ",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 0.828
+    },
+    {
+      "id": 37,
+      "kimariji": "しら",
+      "onset_inaba": 0.053,
+      "onset_kimoto": 0.941
+    },
+    {
+      "id": 38,
+      "kimariji": "わすら",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 0.677
+    },
+    {
+      "id": 39,
+      "kimariji": "あさじ",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 0.984
+    },
+    {
+      "id": 40,
+      "kimariji": "しの",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.034
+    },
+    {
+      "id": 41,
+      "kimariji": "こい",
+      "onset_inaba": 0.053,
+      "onset_kimoto": 0.523
+    },
+    {
+      "id": 42,
+      "kimariji": "ちぎりき",
+      "onset_inaba": 0.051,
+      "onset_kimoto": 0.847
+    },
+    {
+      "id": 43,
+      "kimariji": "あい",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 1.113
+    },
+    {
+      "id": 44,
+      "kimariji": "おおこ",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 0.885
+    },
+    {
+      "id": 45,
+      "kimariji": "あはれ",
+      "onset_inaba": 0.057,
+      "onset_kimoto": 1.291
+    },
+    {
+      "id": 46,
+      "kimariji": "ゆら",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 0.666
+    },
+    {
+      "id": 47,
+      "kimariji": "やえ",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 1.124
+    },
+    {
+      "id": 48,
+      "kimariji": "かぜを",
+      "onset_inaba": 0.052,
+      "onset_kimoto": 0.501
+    },
+    {
+      "id": 49,
+      "kimariji": "みかき",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 1.748
+    },
+    {
+      "id": 50,
+      "kimariji": "きみがためお",
+      "onset_inaba": 0.053,
+      "onset_kimoto": 1.554
+    },
+    {
+      "id": 51,
+      "kimariji": "かく",
+      "onset_inaba": 0.052,
+      "onset_kimoto": 1.093
+    },
+    {
+      "id": 52,
+      "kimariji": "あけ",
+      "onset_inaba": 0.061,
+      "onset_kimoto": 1.59
+    },
+    {
+      "id": 53,
+      "kimariji": "なげき",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.098
+    },
+    {
+      "id": 54,
+      "kimariji": "わすれ",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 0.39
+    },
+    {
+      "id": 55,
+      "kimariji": "たき",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.646
+    },
+    {
+      "id": 56,
+      "kimariji": "あらざ",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 0.984
+    },
+    {
+      "id": 57,
+      "kimariji": "め",
+      "onset_inaba": 0.061,
+      "onset_kimoto": 0.881
+    },
+    {
+      "id": 58,
+      "kimariji": "ありま",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.04
+    },
+    {
+      "id": 59,
+      "kimariji": "やす",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 0.758
+    },
+    {
+      "id": 60,
+      "kimariji": "おおえ",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 0.913
+    },
+    {
+      "id": 61,
+      "kimariji": "いに",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 0.503
+    },
+    {
+      "id": 62,
+      "kimariji": "よを",
+      "onset_inaba": 0.057,
+      "onset_kimoto": 1.073
+    },
+    {
+      "id": 63,
+      "kimariji": "いまは",
+      "onset_inaba": 0.063,
+      "onset_kimoto": 0.333
+    },
+    {
+      "id": 64,
+      "kimariji": "あさぼらけう",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 0.947
+    },
+    {
+      "id": 65,
+      "kimariji": "うら",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 0.857
+    },
+    {
+      "id": 66,
+      "kimariji": "もろ",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 1.192
+    },
+    {
+      "id": 67,
+      "kimariji": "はるの",
+      "onset_inaba": 0.072,
+      "onset_kimoto": 1.444
+    },
+    {
+      "id": 68,
+      "kimariji": "こころに",
+      "onset_inaba": 0.051,
+      "onset_kimoto": 1.304
+    },
+    {
+      "id": 69,
+      "kimariji": "あらし",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 0.908
+    },
+    {
+      "id": 70,
+      "kimariji": "さ",
+      "onset_inaba": 0.061,
+      "onset_kimoto": 1.054
+    },
+    {
+      "id": 71,
+      "kimariji": "ゆう",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 1.086
+    },
+    {
+      "id": 72,
+      "kimariji": "おと",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.452
+    },
+    {
+      "id": 73,
+      "kimariji": "たか",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 1.22
+    },
+    {
+      "id": 74,
+      "kimariji": "うか",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 1.418
+    },
+    {
+      "id": 75,
+      "kimariji": "ちぎりお",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.171
+    },
+    {
+      "id": 76,
+      "kimariji": "わたのはらこ",
+      "onset_inaba": 0.058,
+      "onset_kimoto": 2.016
+    },
+    {
+      "id": 77,
+      "kimariji": "せ",
+      "onset_inaba": 0.063,
+      "onset_kimoto": 1.324
+    },
+    {
+      "id": 78,
+      "kimariji": "あはじ",
+      "onset_inaba": 0.062,
+      "onset_kimoto": 1.005
+    },
+    {
+      "id": 79,
+      "kimariji": "あきか",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.521
+    },
+    {
+      "id": 80,
+      "kimariji": "ながか",
+      "onset_inaba": 0.058,
+      "onset_kimoto": 1.045
+    },
+    {
+      "id": 81,
+      "kimariji": "ほ",
+      "onset_inaba": 0.079,
+      "onset_kimoto": 1.063
+    },
+    {
+      "id": 82,
+      "kimariji": "おも",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 1.078
+    },
+    {
+      "id": 83,
+      "kimariji": "よのなかよ",
+      "onset_inaba": 0.059,
+      "onset_kimoto": 1.095
+    },
+    {
+      "id": 84,
+      "kimariji": "ながら",
+      "onset_inaba": 0.054,
+      "onset_kimoto": 1.771
+    },
+    {
+      "id": 85,
+      "kimariji": "よも",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 1.573
+    },
+    {
+      "id": 86,
+      "kimariji": "なげけ",
+      "onset_inaba": 0.056,
+      "onset_kimoto": 1.916
+    },
+    {
+      "id": 87,
+      "kimariji": "む",
+      "onset_inaba": 0.061,
+      "onset_kimoto": 1.289
+    },
+    {
+      "id": 88,
+      "kimariji": "なにわえ",
+      "onset_inaba": 0.061,
+      "onset_kimoto": 1.506
+    },
+    {
+      "id": 89,
+      "kimariji": "たま",
+      "onset_inaba": 0.051,
+      "onset_kimoto": 1.343
+    },
+    {
+      "id": 90,
+      "kimariji": "みせ",
+      "onset_inaba": 0.055,
+      "onset_kimoto": 1.449
+    },
+    {
+      "id": 91,
+      "kimariji": "きり",
+      "onset_inaba": 0.051,
+      "onset_kimoto": 1.538
+    },
+    {
+      "id": 92,
+      "kimariji": "わがそ",
+      "onset_inaba": 0.063,
+      "onset_kimoto": 1.562
+    },
+    {
+      "id": 93,
+      "kimariji": "よのなかは",
+      "onset_inaba": 0.063,
+      "onset_kimoto": 1.465
+    },
+    {
+      "id": 94,
+      "kimariji": "みよ",
+      "onset_inaba": 0.058,
+      "onset_kimoto": 0.939
+    },
+    {
+      "id": 95,
+      "kimariji": "おおけ",
+      "onset_inaba": 0.058,
+      "onset_kimoto": 1.7
+    },
+    {
+      "id": 96,
+      "kimariji": "はなさ",
+      "onset_inaba": 0.066,
+      "onset_kimoto": 1.752
+    },
+    {
+      "id": 97,
+      "kimariji": "こぬ",
+      "onset_inaba": 0.051,
+      "onset_kimoto": 1.489
+    },
+    {
+      "id": 98,
+      "kimariji": "かぜそ",
+      "onset_inaba": 0.051,
+      "onset_kimoto": 1.19
+    },
+    {
+      "id": 99,
+      "kimariji": "ひとも",
+      "onset_inaba": 0.067,
+      "onset_kimoto": 0.74
+    },
+    {
+      "id": 100,
+      "kimariji": "もも",
+      "onset_inaba": 0.06,
+      "onset_kimoto": 1.409
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); if echo \"$input\" | grep -q 'gas/'; then cd /Users/maruyama/Documents/GitHub/Kikiwake/gas && clasp pull 2>/dev/null; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); if echo \"$input\" | grep -q 'gas/'; then cd /Users/maruyama/Documents/GitHub/Kikiwake/gas && clasp push 2>/dev/null; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -10,23 +10,23 @@ const CONFIG = {
   cueSoundPlaybackDuration: 2,
   cueSoundSilenceDuration: 1000,
   beepFreq: 440,
-  beepDuration: 0.1,
+  beepDuration: 0.05,
   minWait: 800,
   maxWait: 1600
 };
 
 const TEST_CONFIG = {
   motorTrials: 3,
-  mainRepetitions: 5,
+  mainRepetitions: 2,
   testCategoryIds: [1, 5, 10, 25, 50],
-  breakInterval: 2,
+  breakInterval: 5,
   beepFreq: 440,
   beepDuration: 0.1,
   minWait: 100,
   maxWait: 200
 };
 
-const GOOGLE_APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzIhJmEIxwGPdrz7y344x-NR0pi0qDI8AainLiipmtfLqSpqcRa40LOF6K8yO2sHL1e/exec";
+const GOOGLE_APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxPbisOsr_EHK_ZTnUuxda-MywJbMoZ-VU03geQ5rjx0v788Awjx6EsZc1SX0iP3DLp/exec";
 const BASE_PATH = location.pathname.replace(/\/[^\/]*$/, "/");
 
 // ==========================
@@ -70,6 +70,7 @@ let state = {
   isResumed: false,
   resumedTrialCount: 0,
   motorCompletedCount: 0,
+  trialHistory: [],
   sessionTimestamp: new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, ''),
   cueAudioBuffer: null,
   motorResults: [],
@@ -106,45 +107,79 @@ function getAudioContext() {
 let currentSource = null;
 let currentGainNode = null;
 
-async function playSound(sourceData, { offset = 0, duration = undefined, isCue = false } = {}) {
+async function playSound(sourceData, { offset = 0, duration = undefined, isCue = false, stopPrevious = true, when = 0, loop = false } = {}) {
   const ctx = getAudioContext();
   if (ctx.state === "suspended") await ctx.resume();
   try {
     let audioBuffer;
-    if (typeof sourceData === "string") {
-      const url = /^(https?:)?\/\//.test(sourceData) ? sourceData : (BASE_PATH + sourceData);
+    if (sourceData instanceof AudioBuffer) {
+      audioBuffer = sourceData;
+    } else if (typeof sourceData === "string") {
+      const url = /^(https?:)?\/\//.test(sourceData) ? sourceData : (BASE_PATH + url);
       const res = await fetch(url);
       audioBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
-    } else { audioBuffer = sourceData; }
+    }
     
-    stopSound();
+    if (stopPrevious) stopSound();
+    
     const source = ctx.createBufferSource();
     const gain = ctx.createGain();
     source.buffer = audioBuffer;
+    source.loop = loop; // ループ設定を追加
     source.connect(gain);
     gain.connect(ctx.destination);
     
-    if (!isCue) state.t0 = performance.now();
-    source.start(0, Math.max(0, offset), duration === undefined ? audioBuffer.duration - Math.max(0, offset) : duration);
-    currentSource = source; currentGainNode = gain;
+    const startTime = when > 0 ? when : ctx.currentTime;
+    
+    if (!isCue) {
+      // 実際に音が鳴り始める時刻（パフォーマンス計測用）
+      state.t0 = performance.now() + (startTime - ctx.currentTime) * 1000;
+    }
+    
+    source.start(startTime, Math.max(0, offset), duration === undefined ? audioBuffer.duration - Math.max(0, offset) : duration);
+    
+    if (stopPrevious) {
+      currentSource = source; 
+      currentGainNode = gain;
+    }
+    
     return new Promise(resolve => {
-      source.onended = () => { if (currentSource === source) { currentSource = null; currentGainNode = null; } resolve(); };
+      source.onended = () => { 
+        if (stopPrevious && currentSource === source) { 
+          currentSource = null; 
+          currentGainNode = null; 
+        } 
+        resolve(); 
+      };
     });
   } catch (e) { console.error("Audio Error:", e); }
 }
+
+// 音声データを事前にデコードして取得する関数
+async function getAudioBuffer(url) {
+  const ctx = getAudioContext();
+  const targetUrl = /^(https?:)?\/\//.test(url) ? url : (BASE_PATH + url);
+  const res = await fetch(targetUrl);
+  return await ctx.decodeAudioData(await res.arrayBuffer());
+}
 function stopSound() {
   const ctx = getAudioContext();
+  // 1. 全てのゲインを即座にゼロに
   if (currentGainNode) {
     currentGainNode.gain.cancelScheduledValues(ctx.currentTime);
     currentGainNode.gain.setValueAtTime(0, ctx.currentTime);
   }
-  if (currentSource) { try { currentSource.stop(0); } catch(e){} currentSource = null; }
+  // 2. 課題音声を即座に物理停止
+  if (currentSource) {
+    try { currentSource.stop(0); } catch(e){}
+    currentSource = null;
+  }
 }
 
 // ==========================
 // UI Logic
 // ==========================
-const screens = ["welcome", "loading", "motor", "main-intro", "trial", "choice", "break", "results"];
+const screens = ["welcome", "loading", "volume", "motor", "main-intro", "trial", "choice", "break", "results"];
 function showScreen(id) {
   screens.forEach(s => {
     const el = document.getElementById("screen-" + s);
@@ -165,7 +200,12 @@ async function postToGoogleSheet(payload) {
 // Phase: Motor Calibration
 // ==========================
 async function startMotorPhase() {
-  const id = (document.getElementById("participant-id").value || "anon").toLowerCase();
+  const idRaw = document.getElementById("participant-id").value || "anon";
+  // 全角英数字を半角に変換し、小文字に統一
+  const id = idRaw.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
+    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+  }).toLowerCase().trim();
+  
   state.participantId = id;
   state.inputDevice = document.getElementById("input-device").value;
   state.reader = document.getElementById("reader-select").value;
@@ -184,6 +224,8 @@ async function startMotorPhase() {
     if (result.status === "success") {
       state.resumedTrialCount = result.data.completedCount;
       state.motorCompletedCount = result.data.motorCompletedCount;
+      state.unknownPending = result.data.unknownPending || [];
+      console.log("[DEBUG] get_status response:", JSON.stringify(result.data));
       if (state.resumedTrialCount > 0) state.isResumed = true;
       if (result.data.seed) {
         state.participantSeed = result.data.seed;
@@ -193,12 +235,11 @@ async function startMotorPhase() {
         postToGoogleSheet({ type: 'register_seed', data: { participant_id: id, seed: state.participantSeed } });
       }
       // 実験完了済みチェック（テストモードは除く）
-      const totalRequired = CONFIG.totalCategories * CONFIG.mainRepetitions;
-      if (!state.isTestMode && state.resumedTrialCount >= totalRequired) {
-        document.getElementById("results-stats").innerHTML =
-          `<p>参加者ID「${state.participantId}」はすでに実験をすべて完了しています。</p>`;
-        showScreen("results");
-        return;
+      // ※「わからない」で追加された分があるため、履歴がある場合はその総数で判定
+      const totalInitial = CONFIG.totalCategories * CONFIG.mainRepetitions;
+      if (!state.isTestMode && state.resumedTrialCount > 0 && state.resumedTrialCount >= totalInitial) {
+        // ここでの判定は目安。詳細はstartMainPhaseでのデッキ構築後に行う
+        console.log("Checking completion after potential resume...");
       }
     }
   } catch (e) { console.warn("Status Check Failed:", e); }
@@ -208,26 +249,52 @@ async function startMotorPhase() {
   state.motorResults = [];
   
   const normalTarget = (state.isTestMode ? TEST_CONFIG : CONFIG).motorTrials;
-  if (state.isResumed) {
+  if (state.isResumed || state.motorCompletedCount >= normalTarget) {
     state.currentMotorTrial = 0;
     state.targetMotorTrials = 5;
-    alert(`参加者ID: ${id} の続きから再開します。\n（コンディション確認のため、反応速度テストを5回実施します）`);
+    if (state.isResumed) alert(`参加者ID: ${id} の続きから再開します。\n（コンディション確認のため、反応速度テストを5回実施します）`);
   } else {
     state.currentMotorTrial = state.motorCompletedCount;
     state.targetMotorTrials = normalTarget;
   }
   
   document.getElementById("motor-total-trials").textContent = state.targetMotorTrials;
-  showScreen("motor");
+
+  // 合図音を先読みしてループ再生→音量確認画面へ
+  try {
+    const ctx = getAudioContext();
+    const cueFile = state.reader === "sounds_kimoto" ? "sounds_kimoto/序歌 下の句2.m4a" : "sounds_Inaba/I-000B.ogg";
+    const cueRes = await fetch(BASE_PATH + cueFile);
+    state.cueAudioBuffer = await ctx.decodeAudioData(await cueRes.arrayBuffer());
+    // ループ再生
+    stopSound();
+    const src = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    src.buffer = state.cueAudioBuffer;
+    src.loop = true;
+    src.connect(gain); gain.connect(ctx.destination);
+    if (ctx.state === "suspended") await ctx.resume();
+    src.start();
+    currentSource = src; currentGainNode = gain;
+  } catch(e) { console.error("Cue preload error:", e); }
+
+  showScreen("volume");
 }
 
 function handlePress(e) {
+  // 何よりも優先して音を止める（課題音声＋合図音の両方）
+  stopSound();
+  if (activeCueSource) {
+    try { activeCueSource.stop(0); } catch(e){}
+    activeCueSource = null;
+  }
+  
   const now = performance.now();
   if (state.phase === "motor_waiting") {
-    // フィードバックを最初に（即時反応）
+    // フィードバックを最初に
     const motorArea = document.getElementById("motor-area");
     if (motorArea) motorArea.classList.add("responded");
-    stopSound();
+    
     const rt = now - state.t0;
     const res = { participant_id: state.participantId, session_timestamp: state.sessionTimestamp, trial_start_time: state.lastMotorStartTimeJst, trial_num: state.currentMotorTrial, rt_ms: rt, input_device: e.type || "不明" };
     state.motorResults.push(res);
@@ -235,8 +302,7 @@ function handlePress(e) {
     state.phase = "motor_idle";
     setTimeout(() => { if (motorArea) motorArea.classList.remove("responded"); }, 400);
     setTimeout(nextMotorTrial, 500);
-  } else if (state.phase === "main_listening") {
-    stopSound();
+  } else if (state.phase === "main_listening" || state.phase === "main_waiting") {
     state.currentTrialData.press_time = now - state.t0;
     state.currentTrialData.t_prime = state.currentTrialData.press_time - state.t_motor;
     state.currentTrialData.t_press_absolute = now;
@@ -273,8 +339,18 @@ function nextMotorTrial() {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'triangle'; // より聞き取りやすい波形に変更
     osc.frequency.value = CONFIG.beepFreq;
-    osc.start(); osc.stop(ctx.currentTime + CONFIG.beepDuration);
+    
+    const startTime = ctx.currentTime;
+    const endTime = startTime + CONFIG.beepDuration;
+    
+    // フェードアウトを入れてクリックノイズを防止しつつ、最大音量を維持
+    gain.gain.setValueAtTime(1.0, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, endTime);
+    
+    osc.start(startTime);
+    osc.stop(endTime);
     state.t0 = performance.now();
     state.lastMotorStartTimeJst = jstNow;
   }, preparationTime + randomWait);
@@ -285,12 +361,15 @@ function nextMotorTrial() {
 // ==========================
 async function startMainPhase() {
   const reader = state.reader || "sounds_Inaba";
-  try {
-    const ctx = getAudioContext();
-    const cueFile = reader === "sounds_kimoto" ? "sounds_kimoto/序歌.m4a" : "sounds_Inaba/I-000B.ogg";
-    const res = await fetch(BASE_PATH + cueFile);
-    state.cueAudioBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
-  } catch(e){ console.error("Cue load error:", e); }
+  // 音量確認画面で先読み済みの場合はスキップ
+  if (!state.cueAudioBuffer) {
+    try {
+      const ctx = getAudioContext();
+      const cueFile = reader === "sounds_kimoto" ? "sounds_kimoto/序歌 下の句2.m4a" : "sounds_Inaba/I-000B.ogg";
+      const res = await fetch(BASE_PATH + cueFile);
+      state.cueAudioBuffer = await ctx.decodeAudioData(await res.arrayBuffer());
+    } catch(e){ console.error("Cue load error:", e); }
+  }
 
   const config = state.isTestMode ? TEST_CONFIG : CONFIG;
   const kimarijiMap = new Map(state.kimarijiData.map(k => [k.id, k.kimariji]));
@@ -304,15 +383,57 @@ async function startMainPhase() {
   
   let deck = [];
   let cards = state.isTestMode ? state.cardData.filter(c => new Set(config.testCategoryIds).has(c.id)) : state.cardData.filter(c => c.id <= config.totalCategories);
+  const readerKey = reader === "sounds_kimoto" ? "onset_kimoto" : "onset_inaba";
+
   for (const card of cards) {
+    const kInfo = state.kimarijiData.find(k => k.id === card.id);
+    const onset = kInfo ? kInfo[readerKey] : 0.05;
     for (let r = 0; r < config.mainRepetitions; r++) {
-      deck.push({ stimulus_id: card.id, stimulus_file: card.path, rep: r, kimariji: card.kimariji });
+      deck.push({ stimulus_id: card.id, stimulus_file: card.path, kimariji: card.kimariji, onset: onset });
     }
   }
-  state.trialDeck = shuffleWithRng(deck, mulberry32(state.participantSeed)).map((t, i) => ({ ...t, trial_index: i + 1 }));
+  const repCount = {};
+  state.trialDeck = shuffleWithRng(deck, mulberry32(state.participantSeed)).map((t, i) => {
+    repCount[t.stimulus_id] = (repCount[t.stimulus_id] || 0) + 1;
+    return {
+      stimulus_id: t.stimulus_id,
+      stimulus_file: t.stimulus_file,
+      rep: repCount[t.stimulus_id],
+      kimariji: t.kimariji,
+      trial_index: i + 1,
+      onset: t.onset
+    };
+  });
+
+  // 再開時: GASから取得した未回答の「わからない」試行をデッキ末尾に追加
+  if (state.isResumed && state.unknownPending && state.unknownPending.length > 0) {
+    state.unknownPending.forEach(u => {
+      const card = state.cardData.find(c => c.id === Number(u.stimulus_id));
+      const kInfo = state.kimarijiData.find(k => k.id === Number(u.stimulus_id));
+      const onset = kInfo ? kInfo[readerKey] : 0.05;
+      state.trialDeck.push({
+        stimulus_id: Number(u.stimulus_id),
+        stimulus_file: card ? card.path : "",
+        rep: u.rep,
+        kimariji: u.kimariji,
+        trial_index: u.trial_index,
+        onset: onset
+      });
+    });
+  }
   
   state.currentTrialIndex = state.isResumed ? state.resumedTrialCount : 0;
+  // 進捗表示用の分母を更新（初期デッキサイズではなく、現在のデッキサイズにする）
   document.getElementById("total-trials").textContent = state.trialDeck.length;
+
+  // 実験完了済みチェック（復元後のデッキサイズと比較）
+  if (!state.isTestMode && state.currentTrialIndex >= state.trialDeck.length && state.trialDeck.length > 0) {
+    document.getElementById("results-stats").innerHTML =
+      `<p>参加者ID「${state.participantId}」はすでに実験をすべて完了しています。</p>`;
+    showScreen("results");
+    return;
+  }
+  
   nextMainTrial();
 }
 
@@ -327,18 +448,73 @@ function nextMainTrial(fromBreak = false) {
   state.selectedChoice = null;
   showScreen("trial");
   document.getElementById("trial-counter").textContent = state.currentTrialIndex + 1;
+  // 試行が追加されている可能性があるため、常に最新のデッキサイズを表示
   document.getElementById("total-trials").textContent = state.trialDeck.length;
   startTrialWithCue(trial);
 }
 
+let activeCueSource = null; // 合図音の管理用
+
 async function startTrialWithCue(trial) {
-  const cueDuration = state.cueAudioBuffer.duration;
-  const offset = Math.max(0, cueDuration - CONFIG.cueSoundPlaybackDuration);
-  await playSound(state.cueAudioBuffer, { offset, duration: CONFIG.cueSoundPlaybackDuration, isCue: true });
-  await new Promise(r => setTimeout(r, CONFIG.cueSoundSilenceDuration));
-  state.phase = "main_listening";
-  state.currentTrialData.trial_start_time = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
-  playSound(trial.stimulus_file, {});
+  const ctx = getAudioContext();
+  
+  // 1. 次の音声をバックグラウンドで先読み開始
+  const stimulusBufferPromise = getAudioBuffer(trial.stimulus_file);
+  
+  // 2. 合図音の設定
+  const isKimoto = state.reader === "sounds_kimoto";
+  const cueSpeechEnd = isKimoto ? state.cueMetadata.kimoto : state.cueMetadata.inaba;
+  const cueOffset = Math.max(0, cueSpeechEnd - CONFIG.cueSoundPlaybackDuration);
+  const now = ctx.currentTime;
+  
+  if (activeCueSource) { try { activeCueSource.stop(); } catch(e){} }
+  
+  const cueSource = ctx.createBufferSource();
+  const cueGain = ctx.createGain();
+  cueSource.buffer = state.cueAudioBuffer;
+  
+  // 3. 合図音の再生設定（木本さんの場合は余韻がないのでループしない）
+  // 両読手とも読み終わり以降の末尾ノイズ区間をループ（稲葉:0.316s, 木本下の句2:0.790s）
+  cueSource.loop = true;
+  cueSource.loopStart = cueSpeechEnd;
+  cueSource.loopEnd = state.cueAudioBuffer.duration;
+  
+  cueSource.connect(cueGain);
+  cueGain.connect(ctx.destination);
+  cueSource.start(now, cueOffset);
+  activeCueSource = cueSource;
+
+  // 4. 先読みの完了を待つ
+  const stimulusBuffer = await stimulusBufferPromise;
+
+  // 5. ターゲットの再生開始時間を精密に計算
+  const stimulusStartTime = now + CONFIG.cueSoundPlaybackDuration + 1.0 - (trial.onset || 0.05);
+
+  // 6. 再生を予約
+  playSound(stimulusBuffer, { 
+    stopPrevious: true,
+    when: stimulusStartTime
+  });
+
+  // 7. 合図音を、読み上げが実際に始まる瞬間（ファイル開始 + onset）に止める予約
+  if (activeCueSource) {
+    activeCueSource.stop(stimulusStartTime + (trial.onset || 0.05));
+  }
+
+  // 8. 待機中フェーズへ（この時点からボタンが有効になる）
+  // trial_start_timeをnullで確保しておく（早押し時にキー順がズレるのを防ぐ）
+  state.currentTrialData.trial_start_time = null;
+  state.phase = "main_waiting";
+
+  // 9. 状態更新
+  const delayToStartMs = (stimulusStartTime - ctx.currentTime) * 1000;
+  setTimeout(() => {
+    // すでにボタンが押されていたらスキップ
+    if (state.phase === "main_waiting") {
+      state.phase = "main_listening";
+      state.currentTrialData.trial_start_time = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
+    }
+  }, Math.max(0, delayToStartMs));
 }
 
 // ==========================
@@ -562,8 +738,10 @@ function finishExperiment() {
 // ==========================
 async function init() {
   try {
-    const [m, k] = await Promise.all([fetch(BASE_PATH + "manifest.json").then(r => r.json()), fetch(BASE_PATH + "kimariji.json").then(r => r.json())]);
-    state.manifest = m; state.kimarijiData = k;
+    const [m, kData] = await Promise.all([fetch(BASE_PATH + "manifest.json").then(r => r.json()), fetch(BASE_PATH + "kimariji.json").then(r => r.json())]);
+    state.manifest = m; 
+    state.kimarijiData = kData.kimariji;
+    state.cueMetadata = { inaba: kData.cue_speech_end_inaba, kimoto: kData.cue_speech_end_kimoto };
   } catch(e){}
   document.getElementById("btn-start-motor").onclick = startMotorPhase;
   document.getElementById("btn-start-calibration").onclick = () => {
@@ -572,6 +750,7 @@ async function init() {
     // 最初の試行の前に少し待つ
     setTimeout(nextMotorTrial, 1000);
   };
+  document.getElementById("btn-confirm-volume").onclick = () => { stopSound(); showScreen("motor"); };
   document.getElementById("btn-start-main").onclick = startMainPhase;
   document.getElementById("btn-resume").onclick = () => nextMainTrial(true);
   document.getElementById("motor-area").onclick = handlePress;
@@ -592,14 +771,17 @@ async function init() {
       type: 'trial_single',
       data: { participant_id: state.participantId, session_timestamp: state.sessionTimestamp, random_seed: state.participantSeed, is_test_mode: state.isTestMode, t_motor: state.t_motor, userAgent: navigator.userAgent, ...unknownRes }
     });
-    // 刺激情報のみをコピーしてデッキ末尾に追加（タイミングデータは除く）
-    state.trialDeck.push({
+    // 刺激情報のみをコピーしてデッキ末尾に追加
+    // スプレッドシートの列順（repに文字列、kimarijiに数字）に合わせてプロパティを構成
+    const unknownDataForDeck = {
       stimulus_id: state.currentTrialData.stimulus_id,
       stimulus_file: state.currentTrialData.stimulus_file,
       rep: state.currentTrialData.rep,
       kimariji: state.currentTrialData.kimariji,
-      trial_index: state.currentTrialData.trial_index
-    });
+      trial_index: state.currentTrialData.trial_index,
+      onset: state.currentTrialData.onset // 再試行時もOnset時間を引き継ぐ
+    };
+    state.trialDeck.push(unknownDataForDeck);
     state.currentTrialIndex++;
     const o = document.getElementById("pie-overlay"); if(o) o.remove();
     nextMainTrial();

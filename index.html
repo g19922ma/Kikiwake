@@ -45,10 +45,19 @@
             <div class="loader"></div>
         </div>
 
+        <!-- SCREEN: Volume Check -->
+        <div id="screen-volume" class="screen">
+            <h2>音量の確認</h2>
+            <p>序歌が流れています。<br>聞きやすい音量になるよう、イヤホンまたはPCの音量を調節してください。</p>
+            <div id="volume-playing-indicator">♪ 再生中</div>
+            <p style="font-size: 0.85em; color: #666; margin-top: 16px;">実験中はこの音量で固定されます。<br>調節が終わったら下のボタンを押してください。</p>
+            <button id="btn-confirm-volume">この音量で始める</button>
+        </div>
+
         <!-- SCREEN: Motor Calibration -->
         <div id="screen-motor" class="screen">
             <h2>ステップ 1：反応速度の計測</h2>
-            <p>「ピッ」という音が聞こえた瞬間に、できるだけ素早く下のボタンを押してください。</p>
+            <p>「ピッ」という音が聞こえたら、できるだけ早く下のボタンを押してください。</p>
             <p style="font-size: 0.9em; color: #666;"><strong><span id="motor-total-trials">--</span> 回</strong>繰り返します（現在 <span id="motor-counter">0</span> 回目）</p>
             <div id="motor-area-container">
                 <button id="btn-start-calibration">計測を開始する</button>

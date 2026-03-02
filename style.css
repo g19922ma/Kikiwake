@@ -194,6 +194,19 @@ button:disabled { background-color: #ccc; }
 }
 .pie-center-text.active { fill: white; }
 
+/* Volume Check */
+#volume-playing-indicator {
+    font-size: 1.6em;
+    font-weight: bold;
+    color: #28a745;
+    margin: 30px auto;
+    animation: volumePulse 2.5s ease-in-out infinite;
+}
+@keyframes volumePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 /* Loader */
 .loader {
     border: 8px solid #f3f3f3;
