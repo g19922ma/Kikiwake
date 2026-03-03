@@ -371,6 +371,10 @@ function handlePressUp(e) {
     state.currentTrialData.press_time = now - state.t0;
     state.currentTrialData.t_prime = state.currentTrialData.press_time - state.t_motor;
     state.currentTrialData.t_press_absolute = now;
+    // voiceOnset前に離した場合も trial_start_time を記録（事前計算した予定時刻）
+    if (!state.currentTrialData.trial_start_time) {
+      state.currentTrialData.trial_start_time = state.voiceOnsetJst;
+    }
     state.phase = "main_choosing";
     showScreen("choice");
     renderChoiceScreen();
@@ -569,7 +573,9 @@ async function startTrialWithCue(trial) {
     activeCueSource.stop(stimulusStartTime + crossfadeDuration);
   }
 
-  // 8. 待機中フェーズへ（trial_start_timeは発声開始と同時にセット）
+  // 8. 待機中フェーズへ（voiceOnset時刻を事前計算して保存）
+  const delayToVoiceMs = (voiceOnsetTime - ctx.currentTime) * 1000;
+  state.voiceOnsetJst = new Date(Date.now() + delayToVoiceMs + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
   state.currentTrialData.trial_start_time = null;
   state.phase = "main_waiting";
   const trialLbl = document.getElementById("trial-button-label");
@@ -577,12 +583,11 @@ async function startTrialWithCue(trial) {
   const trialHint = document.getElementById("trial-button-hint");
   if (trialHint) trialHint.style.visibility = "hidden";
 
-  // 9. 発声開始時刻にtrial_start_timeを記録
-  const delayToVoiceMs = (voiceOnsetTime - ctx.currentTime) * 1000;
+  // 9. 発声開始タイミングでフェーズ移行
   setTimeout(() => {
     if (state.phase === "main_waiting") {
       state.phase = "main_listening";
-      state.currentTrialData.trial_start_time = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
+      state.currentTrialData.trial_start_time = state.voiceOnsetJst;
     }
   }, Math.max(0, delayToVoiceMs));
 }
