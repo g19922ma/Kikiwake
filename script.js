@@ -7,7 +7,7 @@ const CONFIG = {
   mainRepetitions: 6,
   totalCategories: 100,
   breakInterval: 10,
-  cueSoundPlaybackDuration: 2,
+  cueSoundPlaybackDuration: 2.8,
   cueSoundSilenceDuration: 1000,
   beepFreq: 440,
   beepDuration: 0.05,
@@ -91,7 +91,10 @@ let state = {
   currentLevelMenuItems: [],
   pieMenuCX: 0,
   pieMenuCY: 0,
-  reader: "sounds_Inaba"
+  reader: "sounds_Inaba",
+  pendingTrial: null,
+  pressDownTimer: null,
+  isButtonDown: false
 };
 
 // ==========================
@@ -281,20 +284,72 @@ async function startMotorPhase() {
   showScreen("volume");
 }
 
-function handlePress(e) {
-  // 何よりも優先して音を止める（課題音声＋合図音の両方）
+function handlePressDown(e) {
+  state.isButtonDown = true;
+  if (state.phase === "motor_ready") {
+    state.phase = "motor_pressdown";
+    const mLblDown = document.getElementById("motor-area-label");
+    if (mLblDown) mLblDown.textContent = "音が聞こえたら離す！";
+    const mHintDown = document.getElementById("motor-area-hint");
+    if (mHintDown) mHintDown.style.visibility = "hidden";
+    const config = state.isTestMode ? TEST_CONFIG : CONFIG;
+    // preparationTime(1000ms固定) + randomWait で、すぐに鳴らない
+    const randomWait = 1000 + config.minWait + Math.random() * (config.maxWait - config.minWait);
+    state.pressDownTimer = setTimeout(() => {
+      if (state.phase === "motor_pressdown") {
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'triangle';
+        osc.frequency.value = CONFIG.beepFreq;
+        const startTime = ctx.currentTime;
+        const endTime = startTime + CONFIG.beepDuration;
+        gain.gain.setValueAtTime(1.0, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, endTime);
+        osc.start(startTime);
+        osc.stop(endTime);
+        state.t0 = performance.now();
+        state.lastMotorStartTimeJst = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
+        state.phase = "motor_waiting";
+      }
+    }, randomWait);
+  } else if (state.phase === "main_ready") {
+    state.phase = "main_pressdown";
+    state.pressDownTimer = setTimeout(() => {
+      if (state.phase === "main_pressdown") {
+        startTrialWithCue(state.pendingTrial);
+      }
+    }, 500);
+  }
+}
+
+function handlePressUp(e) {
+  const now = performance.now();
+  state.isButtonDown = false;
+
+  // 最優先：フェーズに関わらず即座に音を止める
   stopSound();
   if (activeCueSource) {
     try { activeCueSource.stop(0); } catch(e){}
     activeCueSource = null;
   }
-  
-  const now = performance.now();
+
+  if (state.phase === "motor_pressdown") {
+    clearTimeout(state.pressDownTimer);
+    state.phase = "motor_ready";
+    return;
+  }
+
+  if (state.phase === "main_pressdown") {
+    clearTimeout(state.pressDownTimer);
+    state.phase = "main_ready";
+    return;
+  }
+
   if (state.phase === "motor_waiting") {
-    // フィードバックを最初に
     const motorArea = document.getElementById("motor-area");
     if (motorArea) motorArea.classList.add("responded");
-    
     const rt = now - state.t0;
     const res = { participant_id: state.participantId, session_timestamp: state.sessionTimestamp, trial_start_time: state.lastMotorStartTimeJst, trial_num: state.currentMotorTrial, rt_ms: rt, input_device: e.type || "不明" };
     state.motorResults.push(res);
@@ -324,36 +379,12 @@ function nextMotorTrial() {
   }
   state.currentMotorTrial++;
   document.getElementById("motor-counter").textContent = state.currentMotorTrial;
-  
-  const config = state.isTestMode ? TEST_CONFIG : CONFIG;
-  
-  // 試行間の「間（ま）」を確保
-  // カウントアップしてから、一定の準備時間(1000ms) + ランダムな待機時間
-  const preparationTime = 1000; 
-  const randomWait = config.minWait + Math.random() * (config.maxWait - config.minWait);
-  
-  setTimeout(() => {
-    state.phase = "motor_waiting";
-    const jstNow = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
-    const ctx = getAudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = 'triangle'; // より聞き取りやすい波形に変更
-    osc.frequency.value = CONFIG.beepFreq;
-    
-    const startTime = ctx.currentTime;
-    const endTime = startTime + CONFIG.beepDuration;
-    
-    // フェードアウトを入れてクリックノイズを防止しつつ、最大音量を維持
-    gain.gain.setValueAtTime(1.0, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, endTime);
-    
-    osc.start(startTime);
-    osc.stop(endTime);
-    state.t0 = performance.now();
-    state.lastMotorStartTimeJst = jstNow;
-  }, preparationTime + randomWait);
+  const mLbl = document.getElementById("motor-area-label");
+  if (mLbl) mLbl.textContent = "ボタンを押して待機してください";
+  const mHintReset = document.getElementById("motor-area-hint");
+  if (mHintReset) mHintReset.style.visibility = "";
+  state.phase = "motor_ready";
+  if (state.isButtonDown) handlePressDown({ type: "resume" });
 }
 
 // ==========================
@@ -450,7 +481,13 @@ function nextMainTrial(fromBreak = false) {
   document.getElementById("trial-counter").textContent = state.currentTrialIndex + 1;
   // 試行が追加されている可能性があるため、常に最新のデッキサイズを表示
   document.getElementById("total-trials").textContent = state.trialDeck.length;
-  startTrialWithCue(trial);
+  state.pendingTrial = trial;
+  state.phase = "main_ready";
+  const lbl = document.getElementById("trial-button-label");
+  if (lbl) lbl.textContent = "ボタンを押して待機してください";
+  const trialHintReset = document.getElementById("trial-button-hint");
+  if (trialHintReset) trialHintReset.style.visibility = "";
+  if (state.isButtonDown) handlePressDown({ type: "resume" });
 }
 
 let activeCueSource = null; // 合図音の管理用
@@ -473,48 +510,71 @@ async function startTrialWithCue(trial) {
   const cueGain = ctx.createGain();
   cueSource.buffer = state.cueAudioBuffer;
   
-  // 3. 合図音の再生設定（木本さんの場合は余韻がないのでループしない）
-  // 両読手とも読み終わり以降の末尾ノイズ区間をループ（稲葉:0.316s, 木本下の句2:0.790s）
-  cueSource.loop = true;
-  cueSource.loopStart = cueSpeechEnd;
-  cueSource.loopEnd = state.cueAudioBuffer.duration;
-  
+  // 3. onsetに基づく再生タイミング計算（発声開始は常に now+3.0s）
+  //   ケースA (onset < 1.0s): 上の句の無音が短いため、序歌末尾ノイズで補う
+  //     → stimulusOffset=0（先頭から）, stimulusStartTime = now+2+(1-onset)
+  //   ケースB (onset >= 1.0s): 上の句に十分な無音があるため、余分な部分をスキップ
+  //     → stimulusOffset=onset-1.0（途中から）, stimulusStartTime = now+2
+  const onset = trial.onset || 0.05;
+  let stimulusOffset, stimulusStartTime;
+  if (onset >= 1.0) {
+    stimulusOffset    = onset - 1.0;                                           // 余分な無音をスキップ
+    stimulusStartTime = now + CONFIG.cueSoundPlaybackDuration;                 // 序歌終了直後から開始
+  } else {
+    stimulusOffset    = 0;                                                     // ファイル先頭から再生
+    stimulusStartTime = now + CONFIG.cueSoundPlaybackDuration + (1.0 - onset); // 末尾ノイズで1秒を補完
+  }
+  const voiceOnsetTime = stimulusStartTime + (onset - stimulusOffset); // 発声開始 = 常に now+3.0s
+
+  // 4. 合図音のループ設定（末尾ノイズが足りない場合のみON、足りる場合は自然終了）
+  //    naturalCueEndTime: ループなしで序歌が自然に終わる時刻
+  const naturalCueEndTime = now + (state.cueAudioBuffer.duration - cueOffset);
+  cueSource.loop = stimulusStartTime > naturalCueEndTime;
+  if (cueSource.loop) {
+    cueSource.loopStart = cueSpeechEnd;
+    cueSource.loopEnd   = state.cueAudioBuffer.duration;
+  }
+
   cueSource.connect(cueGain);
   cueGain.connect(ctx.destination);
   cueSource.start(now, cueOffset);
   activeCueSource = cueSource;
 
-  // 4. 先読みの完了を待つ
+  // 5. 先読みの完了を待つ
   const stimulusBuffer = await stimulusBufferPromise;
 
-  // 5. ターゲットの再生開始時間を精密に計算
-  const stimulusStartTime = now + CONFIG.cueSoundPlaybackDuration + 1.0 - (trial.onset || 0.05);
-
-  // 6. 再生を予約
-  playSound(stimulusBuffer, { 
+  // 6. 上の句を stimulusStartTime に予約（stimulusOffset でファイル先頭の余分な無音をスキップ）
+  playSound(stimulusBuffer, {
     stopPrevious: true,
-    when: stimulusStartTime
+    when: stimulusStartTime,
+    offset: stimulusOffset
   });
 
-  // 7. 合図音を、読み上げが実際に始まる瞬間（ファイル開始 + onset）に止める予約
+  // 7. stimulusStartTime でcueをフェードアウト（crossfade）
+  //    上の句の無音区間に序歌ノイズが混入しないよう、crossfadeDuration で滑らかにゼロへ
+  const crossfadeDuration = Math.min(0.3, onset - stimulusOffset);
+  cueGain.gain.setValueAtTime(1.0, stimulusStartTime);
+  cueGain.gain.linearRampToValueAtTime(0.0, stimulusStartTime + crossfadeDuration);
   if (activeCueSource) {
-    activeCueSource.stop(stimulusStartTime + (trial.onset || 0.05));
+    activeCueSource.stop(stimulusStartTime + crossfadeDuration);
   }
 
-  // 8. 待機中フェーズへ（この時点からボタンが有効になる）
-  // trial_start_timeをnullで確保しておく（早押し時にキー順がズレるのを防ぐ）
+  // 8. 待機中フェーズへ（trial_start_timeは発声開始と同時にセット）
   state.currentTrialData.trial_start_time = null;
   state.phase = "main_waiting";
+  const trialLbl = document.getElementById("trial-button-label");
+  if (trialLbl) trialLbl.textContent = "わかった瞬間に離す！";
+  const trialHint = document.getElementById("trial-button-hint");
+  if (trialHint) trialHint.style.visibility = "hidden";
 
-  // 9. 状態更新
-  const delayToStartMs = (stimulusStartTime - ctx.currentTime) * 1000;
+  // 9. 発声開始時刻にtrial_start_timeを記録
+  const delayToVoiceMs = (voiceOnsetTime - ctx.currentTime) * 1000;
   setTimeout(() => {
-    // すでにボタンが押されていたらスキップ
     if (state.phase === "main_waiting") {
       state.phase = "main_listening";
       state.currentTrialData.trial_start_time = new Date(Date.now() + (9 * 60 * 60 * 1000)).toISOString().replace('T', ' ').replace(/\..+/, '');
     }
-  }, Math.max(0, delayToStartMs));
+  }, Math.max(0, delayToVoiceMs));
 }
 
 // ==========================
@@ -753,8 +813,16 @@ async function init() {
   document.getElementById("btn-confirm-volume").onclick = () => { stopSound(); showScreen("motor"); };
   document.getElementById("btn-start-main").onclick = startMainPhase;
   document.getElementById("btn-resume").onclick = () => nextMainTrial(true);
-  document.getElementById("motor-area").onclick = handlePress;
-  document.getElementById("press-button").onclick = handlePress;
+  const motorAreaEl = document.getElementById("motor-area");
+  const pressBtnEl = document.getElementById("press-button");
+  motorAreaEl.addEventListener("mousedown", handlePressDown);
+  motorAreaEl.addEventListener("mouseup", handlePressUp);
+  motorAreaEl.addEventListener("touchstart", (e) => { e.preventDefault(); handlePressDown(e); }, { passive: false });
+  motorAreaEl.addEventListener("touchend", (e) => { e.preventDefault(); handlePressUp(e); }, { passive: false });
+  pressBtnEl.addEventListener("mousedown", handlePressDown);
+  pressBtnEl.addEventListener("mouseup", handlePressUp);
+  pressBtnEl.addEventListener("touchstart", (e) => { e.preventDefault(); handlePressDown(e); }, { passive: false });
+  pressBtnEl.addEventListener("touchend", (e) => { e.preventDefault(); handlePressUp(e); }, { passive: false });
   document.getElementById("btn-unknown-global").onclick = () => {
     // わからない回答をGASに保存
     const t_unknown = state.currentTrialData.t_press_absolute
@@ -788,12 +856,18 @@ async function init() {
   };
   document.getElementById("test-mode-toggle").onchange = (e) => state.isTestMode = e.target.checked;
   window.onkeydown = (e) => {
-    if (e.code === "Space" && (state.phase === "motor_waiting" || state.phase === "main_listening")) { e.preventDefault(); handlePress(e); }
+    if (e.code === "Space" && !e.repeat) {
+      e.preventDefault();
+      handlePressDown(e);
+    }
     if (e.code === "Escape" && document.getElementById("pie-overlay")) {
       e.preventDefault();
       if (state.selectedChoice) { state.selectedChoice = null; applyPieDeselection(document.getElementById("pie-svg")); }
       else goBackInMenu();
     }
+  };
+  window.onkeyup = (e) => {
+    if (e.code === "Space") handlePressUp(e);
   };
 }
 init();

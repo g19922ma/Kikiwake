@@ -57,12 +57,13 @@
         <!-- SCREEN: Motor Calibration -->
         <div id="screen-motor" class="screen">
             <h2>ステップ 1：反応速度の計測</h2>
-            <p>「ピッ」という音が聞こえたら、できるだけ早く下のボタンを押してください。</p>
+            <p>ボタンを押し続けていてください。「ピッ」という音が聞こえたら、できるだけ早くボタンから手を離してください。</p>
             <p style="font-size: 0.9em; color: #666;"><strong><span id="motor-total-trials">--</span> 回</strong>繰り返します（現在 <span id="motor-counter">0</span> 回目）</p>
             <div id="motor-area-container">
                 <button id="btn-start-calibration">計測を開始する</button>
                 <div id="motor-area" style="display: none;">
-                    <p>音が聞こえたらここを押す</p>
+                    <span id="motor-area-label">ボタンを押して待機してください</span>
+                    <span id="motor-area-hint" style="font-size: 0.6em; color: #888;">（クリック または スペースキー）</span>
                 </div>
             </div>
         </div>
@@ -71,12 +72,13 @@
         <div id="screen-main-intro" class="screen">
             <h2>ステップ 2：本課題</h2>
             <p>これから百人一首の歌を聴いてもらいます。</p>
+            <p style="font-size:0.9em; color:#555; margin-bottom: 8px;">⚠️ 識別が確定する前に予測的にボタンを離さないよう注意してください。</p>
             <ol style="text-align: left; line-height: 2em;">
                 <li>序歌の終わりの部分が流れます。それが合図です。</li>
-                <li>歌が<strong>「何の歌かわかった」と思った瞬間に、すぐにボタンを押してください。</strong></li>
+                <li>ボタンを押し続けながら歌を聴いてください。<strong>歌が識別できた瞬間に、ボタンから手を離してください。</strong></li>
                 <li>歌が止まったら、どの歌だったか答えてください。</li>
             </ol>
-            <p style="font-size: 0.9em; color: #666;">わからなかった場合は「わからない」ボタンを押してください。</p>
+            <p style="font-size: 0.9em; color: #666;">ボタンを誤って押した場合は「誤ってボタンを押してしまった」ボタンを使ってください。</p>
             <button id="btn-start-main">本課題を開始する</button>
         </div>
 
@@ -84,7 +86,7 @@
         <div id="screen-trial" class="screen">
             <h2>歌が流れます。聴いてください。</h2>
             <p style="color: #888; font-size: 0.9em;">試行 <span id="trial-counter">0</span> / <span id="total-trials">--</span></p>
-            <div id="press-button">わかった瞬間に押す！<br><span style="font-size: 0.6em; color: #888;">（クリック または スペースキー）</span></div>
+            <div id="press-button"><span id="trial-button-label">ボタンを押して待機してください</span><span id="trial-button-hint" style="font-size: 0.6em; color: #888;">（クリック または スペースキー）</span></div>
         </div>
 
         <!-- SCREEN: Choice -->
@@ -99,7 +101,7 @@
                 </div>
             </div>
             <div class="choice-controls">
-                <button id="btn-unknown-global" class="btn-secondary">わからない（後でもう一度流れます）</button>
+                <button id="btn-unknown-global" class="btn-secondary">誤ってボタンを押してしまった</button>
             </div>
         </div>
 
