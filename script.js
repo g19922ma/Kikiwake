@@ -26,6 +26,16 @@ const TEST_CONFIG = {
   maxWait: 200
 };
 
+// 歴史的仮名遣い→現代仮名ファイル名変換テーブル
+const KIMARIJI_FILENAME_MAP = {
+  'わがゐ': 'わがい',
+  'あはれ': 'あわれ',
+  'あはじ': 'あわじ',
+};
+function kimarijiToFilename(kim) {
+  return KIMARIJI_FILENAME_MAP[kim] || kim;
+}
+
 const GOOGLE_APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxPbisOsr_EHK_ZTnUuxda-MywJbMoZ-VU03geQ5rjx0v788Awjx6EsZc1SX0iP3DLp/exec";
 const BASE_PATH = location.pathname.replace(/\/[^\/]*$/, "/");
 
@@ -406,7 +416,7 @@ async function startMainPhase() {
   const kimarijiMap = new Map(state.kimarijiData.map(k => [k.id, k.kimariji]));
   if (reader === "sounds_kimoto") {
     state.cardData = state.kimarijiData.map(k => ({
-      id: k.id, label: k.kimariji, path: `sounds_kimoto/${k.kimariji} 上.m4a`, kimariji: k.kimariji
+      id: k.id, label: k.kimariji, path: `sounds_kimoto/${kimarijiToFilename(k.kimariji)} 上.m4a`, kimariji: k.kimariji
     }));
   } else {
     state.cardData = state.manifest.filter(m => m.path.endsWith("A.ogg")).map(m => ({ id: m.category_id, label: m.label, path: m.path, kimariji: kimarijiMap.get(m.category_id) || "" })).filter(c => c.kimariji);
