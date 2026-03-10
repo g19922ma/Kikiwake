@@ -57,12 +57,11 @@
         <!-- SCREEN: Motor Calibration -->
         <div id="screen-motor" class="screen">
             <h2>ステップ 1：反応速度の計測</h2>
-            <p>ボタンを押し続けていてください。「ピッ」という音が聞こえたら、できるだけ早くボタンから手を離してください。</p>
+            <p>下のエリアを<strong>押し続けて</strong>待ってください。「ピッ」という音が聞こえたら、できるだけ早く離してください。</p>
             <p style="font-size: 0.9em; color: #666;"><strong><span id="motor-total-trials">--</span> 回</strong>繰り返します（現在 <span id="motor-counter">0</span> 回目）</p>
             <div id="motor-area-container">
-                <button id="btn-start-calibration">計測を開始する</button>
-                <div id="motor-area" style="display: none;">
-                    <span id="motor-area-label">ボタンを押して待機してください</span>
+                <div id="motor-area">
+                    <span id="motor-area-label">押して待機してください</span>
                     <span id="motor-area-hint" style="font-size: 0.6em; color: #888;">（クリック または スペースキー）</span>
                 </div>
             </div>
@@ -78,7 +77,11 @@
                 <li>ボタンを押し続けながら歌を聴いてください。<strong>歌が識別できた瞬間に、ボタンから手を離してください。</strong></li>
                 <li>歌が止まったら、どの歌だったか答えてください。</li>
             </ol>
+            <p style="font-size: 0.9em; color: #666;">同じ歌が何度も読み上げられます。過去に出た歌でも、再び出る可能性があります。</p>
             <p style="font-size: 0.9em; color: #666;">ボタンを誤って押した場合は「誤ってボタンを押してしまった」ボタンを使ってください。</p>
+            <p style="font-size: 0.9em; color: #555; margin-top: 12px;">音声のイメージを確認できます：</p>
+            <button id="btn-sample" data-playing="0" onclick="playSample()" style="background-color: #6c757d; margin-bottom: 12px;">サンプルを聴く</button>
+            <br>
             <button id="btn-start-main">本課題を開始する</button>
         </div>
 

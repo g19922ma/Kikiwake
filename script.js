@@ -18,7 +18,7 @@ const CONFIG = {
 const TEST_CONFIG = {
   motorTrials: 3,
   mainRepetitions: 2,
-  testCategoryIds: [1, 5, 10, 25, 50],
+  testCategoryIds: [1, 5, 17, 25, 50],
   breakInterval: 5,
   beepFreq: 440,
   beepDuration: 0.1,
@@ -394,7 +394,7 @@ function nextMotorTrial() {
   state.currentMotorTrial++;
   document.getElementById("motor-counter").textContent = state.currentMotorTrial;
   const mLbl = document.getElementById("motor-area-label");
-  if (mLbl) mLbl.textContent = "ボタンを押して待機してください";
+  if (mLbl) mLbl.textContent = "押して待機してください";
   const mHintReset = document.getElementById("motor-area-hint");
   if (mHintReset) mHintReset.style.visibility = "";
   state.phase = "motor_ready";
@@ -498,7 +498,7 @@ function nextMainTrial(fromBreak = false) {
   state.pendingTrial = trial;
   state.phase = "main_ready";
   const lbl = document.getElementById("trial-button-label");
-  if (lbl) lbl.textContent = "ボタンを押して待機してください";
+  if (lbl) lbl.textContent = "押して待機してください";
   const trialHintReset = document.getElementById("trial-button-hint");
   if (trialHintReset) trialHintReset.style.visibility = "";
   if (state.isButtonDown) handlePressDown({ type: "resume" });
@@ -590,6 +590,79 @@ async function startTrialWithCue(trial) {
       state.currentTrialData.trial_start_time = state.voiceOnsetJst;
     }
   }, Math.max(0, delayToVoiceMs));
+}
+
+// サンプル音声再生（main-intro画面の「サンプルを聴く」用、試行状態を変更しない）
+async function playSample() {
+  const btn = document.getElementById("btn-sample");
+  if (!btn) return;
+
+  // 再生中なら停止
+  if (btn.dataset.playing === "1") {
+    stopSound();
+    if (activeCueSource) { try { activeCueSource.stop(); } catch(e){} activeCueSource = null; }
+    btn.textContent = "サンプルを聴く";
+    btn.dataset.playing = "0";
+    return;
+  }
+
+  // cardDataはstartMainPhase後に構築されるため、kimarijiDataから直接サンプルカードを作る
+  const readerKey = state.reader === "sounds_kimoto" ? "onset_kimoto" : "onset_inaba";
+  const kInfo = state.kimarijiData[0];
+  if (!kInfo) return;
+  const sampleFile = state.reader === "sounds_kimoto"
+    ? `sounds_kimoto/${kimarijiToFilename(kInfo.kimariji)} 上.m4a`
+    : state.manifest.find(m => m.category_id === kInfo.id && m.path.endsWith("A.ogg"))?.path;
+  if (!sampleFile) return;
+  const onset = kInfo[readerKey] || 0.05;
+
+  btn.textContent = "停止";
+  btn.dataset.playing = "1";
+
+  const ctx = getAudioContext();
+  const isKimoto = state.reader === "sounds_kimoto";
+  const cueSpeechEnd = isKimoto ? state.cueMetadata.kimoto : state.cueMetadata.inaba;
+  const cueOffset = Math.max(0, cueSpeechEnd - CONFIG.cueSoundPlaybackDuration);
+  const now = ctx.currentTime;
+
+  if (activeCueSource) { try { activeCueSource.stop(); } catch(e){} }
+  const cueSource = ctx.createBufferSource();
+  const cueGain = ctx.createGain();
+  cueSource.buffer = state.cueAudioBuffer;
+
+  let stimulusOffset, stimulusStartTime;
+  if (onset >= 1.0) {
+    stimulusOffset    = onset - 1.0;
+    stimulusStartTime = now + CONFIG.cueSoundPlaybackDuration;
+  } else {
+    stimulusOffset    = 0;
+    stimulusStartTime = now + CONFIG.cueSoundPlaybackDuration + (1.0 - onset);
+  }
+
+  const naturalCueEndTime = now + (state.cueAudioBuffer.duration - cueOffset);
+  cueSource.loop = stimulusStartTime > naturalCueEndTime;
+  if (cueSource.loop) { cueSource.loopStart = cueSpeechEnd; cueSource.loopEnd = state.cueAudioBuffer.duration; }
+  cueSource.connect(cueGain); cueGain.connect(ctx.destination);
+  cueSource.start(now, cueOffset);
+  activeCueSource = cueSource;
+
+  const stimulusBuffer = await getAudioBuffer(sampleFile);
+  // isCue:true で state.t0 を上書きしない
+  playSound(stimulusBuffer, { stopPrevious: true, when: stimulusStartTime, offset: stimulusOffset, isCue: true });
+
+  const crossfadeDuration = Math.min(0.3, onset - stimulusOffset);
+  cueGain.gain.setValueAtTime(1.0, stimulusStartTime);
+  cueGain.gain.linearRampToValueAtTime(0.0, stimulusStartTime + crossfadeDuration);
+  if (activeCueSource) activeCueSource.stop(stimulusStartTime + crossfadeDuration);
+
+  // 上の句が終わったらボタンを戻す
+  const stimulusDuration = stimulusBuffer.duration - stimulusOffset;
+  setTimeout(() => {
+    if (btn.dataset.playing === "1") {
+      btn.textContent = "サンプルを聴く";
+      btn.dataset.playing = "0";
+    }
+  }, (stimulusStartTime - now + stimulusDuration) * 1000);
 }
 
 // ==========================
@@ -821,25 +894,28 @@ async function init() {
     state.cueMetadata = { inaba: kData.cue_speech_end_inaba, kimoto: kData.cue_speech_end_kimoto };
   } catch(e){}
   document.getElementById("btn-start-motor").onclick = startMotorPhase;
-  document.getElementById("btn-start-calibration").onclick = () => {
-    document.getElementById("btn-start-calibration").style.display = "none";
-    document.getElementById("motor-area").style.display = "flex";
-    // 最初の試行の前に少し待つ
-    setTimeout(nextMotorTrial, 1000);
+  // motor画面表示時に自動でnextMotorTrialを呼ぶ（開始ボタン廃止）
+  document.getElementById("btn-confirm-volume").onclick = () => { stopSound(); showScreen("motor"); setTimeout(nextMotorTrial, 500); };
+  document.getElementById("btn-start-main").onclick = () => {
+    // サンプル再生中なら停止
+    const sampleBtn = document.getElementById("btn-sample");
+    if (sampleBtn && sampleBtn.dataset.playing === "1") {
+      stopSound();
+      if (activeCueSource) { try { activeCueSource.stop(); } catch(e){} activeCueSource = null; }
+      sampleBtn.dataset.playing = "0";
+    }
+    startMainPhase();
   };
-  document.getElementById("btn-confirm-volume").onclick = () => { stopSound(); showScreen("motor"); };
-  document.getElementById("btn-start-main").onclick = startMainPhase;
   document.getElementById("btn-resume").onclick = () => nextMainTrial(true);
   const motorAreaEl = document.getElementById("motor-area");
   const pressBtnEl = document.getElementById("press-button");
   motorAreaEl.addEventListener("mousedown", handlePressDown);
-  motorAreaEl.addEventListener("mouseup", handlePressUp);
   motorAreaEl.addEventListener("touchstart", (e) => { e.preventDefault(); handlePressDown(e); }, { passive: false });
-  motorAreaEl.addEventListener("touchend", (e) => { e.preventDefault(); handlePressUp(e); }, { passive: false });
   pressBtnEl.addEventListener("mousedown", handlePressDown);
-  pressBtnEl.addEventListener("mouseup", handlePressUp);
   pressBtnEl.addEventListener("touchstart", (e) => { e.preventDefault(); handlePressDown(e); }, { passive: false });
-  pressBtnEl.addEventListener("touchend", (e) => { e.preventDefault(); handlePressUp(e); }, { passive: false });
+  // mouseup/touchend は window で一元管理（要素の外でリリースしても isButtonDown が残らないよう）
+  window.addEventListener("mouseup", (e) => { if (state.isButtonDown) handlePressUp(e); });
+  window.addEventListener("touchend", (e) => { if (state.isButtonDown) { e.preventDefault(); handlePressUp(e); } }, { passive: false });
   document.getElementById("btn-unknown-global").onclick = () => {
     // わからない回答をGASに保存
     const t_unknown = state.currentTrialData.t_press_absolute
