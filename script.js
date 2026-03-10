@@ -545,7 +545,7 @@ async function startTrialWithCue(trial) {
   const naturalCueEndTime = now + (state.cueAudioBuffer.duration - cueOffset);
   cueSource.loop = stimulusStartTime > naturalCueEndTime;
   if (cueSource.loop) {
-    cueSource.loopStart = cueSpeechEnd;
+    cueSource.loopStart = isKimoto ? state.cueMetadata.loopStartKimoto : state.cueMetadata.loopStartInaba;
     cueSource.loopEnd   = state.cueAudioBuffer.duration;
   }
 
@@ -608,7 +608,7 @@ async function playSample() {
 
   // cardDataはstartMainPhase後に構築されるため、kimarijiDataから直接サンプルカードを作る
   const readerKey = state.reader === "sounds_kimoto" ? "onset_kimoto" : "onset_inaba";
-  const kInfo = state.kimarijiData[0];
+  const kInfo = state.kimarijiData[Math.floor(Math.random() * state.kimarijiData.length)];
   if (!kInfo) return;
   const sampleFile = state.reader === "sounds_kimoto"
     ? `sounds_kimoto/${kimarijiToFilename(kInfo.kimariji)} 上.m4a`
@@ -641,7 +641,7 @@ async function playSample() {
 
   const naturalCueEndTime = now + (state.cueAudioBuffer.duration - cueOffset);
   cueSource.loop = stimulusStartTime > naturalCueEndTime;
-  if (cueSource.loop) { cueSource.loopStart = cueSpeechEnd; cueSource.loopEnd = state.cueAudioBuffer.duration; }
+  if (cueSource.loop) { cueSource.loopStart = isKimoto ? state.cueMetadata.loopStartKimoto : state.cueMetadata.loopStartInaba; cueSource.loopEnd = state.cueAudioBuffer.duration; }
   cueSource.connect(cueGain); cueGain.connect(ctx.destination);
   cueSource.start(now, cueOffset);
   activeCueSource = cueSource;
@@ -891,7 +891,7 @@ async function init() {
     const [m, kData] = await Promise.all([fetch(BASE_PATH + "manifest.json").then(r => r.json()), fetch(BASE_PATH + "kimariji.json").then(r => r.json())]);
     state.manifest = m; 
     state.kimarijiData = kData.kimariji;
-    state.cueMetadata = { inaba: kData.cue_speech_end_inaba, kimoto: kData.cue_speech_end_kimoto };
+    state.cueMetadata = { inaba: kData.cue_speech_end_inaba, kimoto: kData.cue_speech_end_kimoto, loopStartInaba: kData.cue_loop_start_inaba, loopStartKimoto: kData.cue_loop_start_kimoto };
   } catch(e){}
   document.getElementById("btn-start-motor").onclick = startMotorPhase;
   // motor画面表示時に自動でnextMotorTrialを呼ぶ（開始ボタン廃止）

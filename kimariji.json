@@ -1,6 +1,8 @@
 {
   "cue_speech_end_inaba": 8.025,
   "cue_speech_end_kimoto": 8.469,
+  "cue_loop_start_kimoto": 8.86,
+  "cue_loop_start_inaba": 8.025,
   "kimariji": [
     {
       "id": 1,
