@@ -181,8 +181,17 @@ button:disabled { background-color: #ccc; }
   font-weight: bold;
   pointer-events: none;
   user-select: none;
+  fill: #111;
+  stroke: white;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
 }
-.pie-label.selected { fill: white; }
+.pie-label.selected {
+  fill: white;
+  stroke: #0056b3;
+  stroke-width: 3px;
+}
 
 /* 中央の決定・戻るボタン */
 .pie-center-group { cursor: pointer; }

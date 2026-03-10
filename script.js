@@ -679,6 +679,8 @@ function renderPieRoot(cx, cy, items, parentLabel = "") {
   centerG.appendChild(text);
   svg.appendChild(centerG);
   renderPieLevel(cx, cy, items, 1);
+  // 事前に selectedChoice が設定されている場合（一字決まりなど）、描画後に確実に選択状態を反映
+  if (state.selectedChoice) applyPieSelection(svg);
 }
 
 function renderPieLevel(cx, cy, items, level, startA = -Math.PI/2, span = 2*Math.PI) {
@@ -689,7 +691,7 @@ function renderPieLevel(cx, cy, items, level, startA = -Math.PI/2, span = 2*Math
     if (parseInt(el.getAttribute('data-pie-level')) >= level) el.remove();
   });
 
-  const inner = 60 + (85 * (level-1)), outer = inner + 80;
+  const inner = 70 + (110 * (level-1)), outer = inner + 110;
   const rng = mulberry32(state.menuSeedBase + level);
   const rotatedItems = shuffleWithRng(items, rng);
   // レベル1（全円）のみランダム回転。サブレベルは回転なし（親セクター内に収める）
