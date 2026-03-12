@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>競技かるた 聴き分け速度 配信オーバーレイ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── レイアウト ── */
+  .app { display: flex; flex-direction: column; height: 100vh; }
+  .main { display: flex; flex: 1; overflow: hidden; }
+  .left-panel { width: 340px; background: #161b22; border-right: 1px solid #30363d; overflow-y: auto; flex-shrink: 0; }
+  .right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .overlay-area { flex: 1; background: #0d1117; position: relative; overflow: hidden; }
+
+  /* ── ヘッダー ── */
+  .header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .header h1 { font-size: 15px; font-weight: 700; color: #58a6ff; }
+  .header .subtitle { font-size: 11px; color: #8b949e; }
+  .live-badge {
+    background: #da3633; color: white; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px; letter-spacing: 1px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+  /* ── 歌リスト ── */
+  .song-list-header {
+    padding: 10px 14px 6px;
+    font-size: 11px; color: #8b949e; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px;
+    border-bottom: 1px solid #21262d;
+  }
+  .search-box {
+    margin: 8px 10px;
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    padding: 6px 10px; color: #e6edf3; font-size: 13px; width: calc(100% - 20px);
+    outline: none;
+  }
+  .search-box:focus { border-color: #58a6ff; }
+  .song-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; cursor: pointer;
+    border-bottom: 1px solid #21262d;
+    transition: background .1s;
+  }
+  .song-item:hover { background: #21262d; }
+  .song-item.active { background: #1f3a5f; border-left: 3px solid #58a6ff; }
+  .song-kimariji { font-size: 14px; font-weight: 700; min-width: 70px; color: #e6edf3; }
+  .song-diff { display: flex; gap: 2px; }
+  .star { color: #f0b429; font-size: 10px; }
+  .star.empty { color: #30363d; }
+  .song-bars { display: flex; gap: 3px; align-items: center; flex: 1; }
+  .mini-bar-wrap { display: flex; flex-direction: column; gap: 1px; flex: 1; }
+  .mini-bar { height: 5px; border-radius: 2px; min-width: 2px; }
+  .bar-m { background: #58a6ff; }
+  .bar-k { background: #3fb950; }
+
+  /* ── 配信オーバーレイ ── */
+
+  /* 歌選択前の画面 */
+  .no-song {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; gap: 16px; opacity: .4;
+  }
+  .no-song .icon { font-size: 48px; }
+  .no-song p { font-size: 14px; color: #8b949e; }
+
+  /* メインオーバーレイ */
+  .overlay-card {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(13,17,23,.95) 20%);
+    padding: 20px 28px 28px;
+    display: none;
+  }
+  .overlay-card.visible { display: block; }
+
+  .song-title-row {
+    display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px;
+  }
+  .big-kimariji {
+    font-size: 52px; font-weight: 900;
+    background: linear-gradient(135deg, #ffffff, #a5c8ff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .song-meta { display: flex; flex-direction: column; gap: 4px; }
+  .diff-label { font-size: 11px; color: #8b949e; }
+  .diff-stars { font-size: 16px; }
+  .cv-label { font-size: 11px; color: #8b949e; }
+  .cv-value { font-size: 13px; font-weight: 600; }
+
+  /* 選手比較バー */
+  .players-row {
+    display: flex; gap: 16px;
+  }
+  .player-card {
+    flex: 1; background: rgba(22,27,34,.9);
+    border-radius: 10px; padding: 14px 18px;
+    border: 1px solid #30363d;
+    position: relative; overflow: hidden;
+  }
+  .player-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .player-card.maruyama::before { background: #58a6ff; }
+  .player-card.kurihara::before { background: #3fb950; }
+
+  .player-name { font-size: 12px; font-weight: 700; letter-spacing: .5px; margin-bottom: 8px; }
+  .player-card.maruyama .player-name { color: #58a6ff; }
+  .player-card.kurihara .player-name { color: #3fb950; }
+
+  .speed-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+  .speed-value { font-size: 36px; font-weight: 900; line-height: 1; }
+  .player-card.maruyama .speed-value { color: #79c0ff; }
+  .player-card.kurihara .speed-value { color: #56d364; }
+  .speed-unit { font-size: 13px; color: #8b949e; }
+  .speed-label { font-size: 11px; color: #8b949e; margin-bottom: 10px; }
+
+  /* スピードバー */
+  .bar-container { position: relative; height: 8px; background: #21262d; border-radius: 4px; margin-bottom: 8px; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+  .bar-fill.maruyama { background: linear-gradient(90deg, #1f6feb, #58a6ff); }
+  .bar-fill.kurihara { background: linear-gradient(90deg, #1a7f37, #3fb950); }
+
+  .player-stats { display: flex; gap: 12px; }
+  .stat-item { display: flex; flex-direction: column; gap: 2px; }
+  .stat-label { font-size: 10px; color: #8b949e; }
+  .stat-val { font-size: 13px; font-weight: 600; color: #e6edf3; }
+
+  /* 有利バッジ */
+  .advantage-badge {
+    position: absolute; top: 12px; right: 12px;
+    font-size: 10px; font-weight: 700; padding: 3px 8px;
+    border-radius: 12px; letter-spacing: .5px;
+  }
+  .badge-faster { background: rgba(240,180,41,.2); color: #f0b429; border: 1px solid #f0b42944; }
+  .badge-slower { background: rgba(139,148,158,.1); color: #8b949e; }
+
+  /* 差分インジケーター */
+  .diff-indicator {
+    text-align: center; padding: 10px 0 4px;
+    font-size: 12px; color: #8b949e;
+  }
+  .diff-number { font-size: 18px; font-weight: 700; color: #f0b429; }
+
+  /* ── トップのライブプレビュー ── */
+  .preview-header {
+    background: #161b22; border-bottom: 1px solid #30363d;
+    padding: 8px 16px; font-size: 11px; color: #8b949e;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ── 全100首グラフビュー ── */
+  .chart-view {
+    flex: 1; overflow-y: auto; padding: 16px 20px;
+    display: none;
+  }
+  .chart-view.visible { display: block; }
+  .chart-title { font-size: 13px; font-weight: 700; color: #e6edf3; margin-bottom: 12px; }
+  .chart-row {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 3px;
+    cursor: pointer; border-radius: 4px; padding: 2px 4px;
+  }
+  .chart-row:hover { background: #21262d; }
+  .chart-row.active { background: #1f3a5f; }
+  .chart-km { font-size: 11px; min-width: 62px; color: #8b949e; text-align: right; }
+  .chart-bar-area { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .chart-bar-row { display: flex; align-items: center; gap: 4px; }
+  .chart-bar { height: 8px; border-radius: 2px; transition: width .3s; }
+  .chart-bar.m { background: #58a6ff; }
+  .chart-bar.k { background: #3fb950; }
+  .chart-val { font-size: 10px; min-width: 36px; color: #8b949e; }
+
+  /* ── タブ ── */
+  .tabs {
+    display: flex; border-bottom: 1px solid #30363d;
+    padding: 0 16px;
+  }
+  .tab {
+    padding: 8px 16px; font-size: 12px; cursor: pointer;
+    border-bottom: 2px solid transparent; color: #8b949e;
+    transition: all .15s;
+  }
+  .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+
+  /* ── プロフィールパネル ── */
+  .profile-view { padding: 16px 20px; display: none; overflow-y: auto; }
+  .profile-view.visible { display: block; }
+  .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .profile-card {
+    background: #161b22; border-radius: 8px; padding: 14px;
+    border: 1px solid #30363d;
+  }
+  .profile-card-title { font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+  .profile-card.m .profile-card-title { color: #58a6ff; }
+  .profile-card.k .profile-card-title { color: #3fb950; }
+  .profile-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid #21262d; }
+  .profile-stat-label { font-size: 11px; color: #8b949e; }
+  .profile-stat-val { font-size: 13px; font-weight: 600; }
+
+  /* ── 実況コメント案 ── */
+  .commentary-box {
+    margin-top: 12px; background: #161b22; border: 1px solid #30363d;
+    border-radius: 8px; padding: 12px 14px;
+  }
+  .commentary-title { font-size: 11px; color: #8b949e; margin-bottom: 6px; font-weight: 600; }
+  .commentary-text { font-size: 13px; color: #e6edf3; line-height: 1.6; }
+  .commentary-highlight { color: #f0b429; font-weight: 700; }
+
+  /* ── スクロールバー ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0d1117; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <span class="live-badge">LIVE</span>
+    <div>
+      <h1>競技かるた 聴き分け速度 解析</h1>
+      <div class="subtitle">Kikiwake Analytics System — maruyama1 vs kurihara-pilot1</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;">
+      <div style="font-size:11px;color:#8b949e;text-align:right;">
+        <div style="color:#3fb950;font-weight:700;">● データ接続中</div>
+        <div>有効試行: 1,199件 ／ 100首</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- 左: 歌選択リスト -->
+    <div class="left-panel">
+      <div class="song-list-header">歌を選ぶ（読まれたらクリック）</div>
+      <input class="search-box" type="text" id="searchBox" placeholder="決まり字で検索..." oninput="filterSongs()">
+      <div id="songList"></div>
+    </div>
+
+    <!-- 右: メイン表示 -->
+    <div class="right-panel">
+
+      <!-- タブ -->
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('overlay')">📺 配信オーバーレイ</div>
+        <div class="tab" onclick="switchTab('chart')">📊 全100首グラフ</div>
+        <div class="tab" onclick="switchTab('profile')">👤 選手プロファイル</div>
+      </div>
+
+      <!-- オーバーレイビュー -->
+      <div class="overlay-area" id="overlayView">
+        <!-- 背景イメージ（試合っぽい雰囲気） -->
+        <div style="position:absolute;inset:0;background:linear-gradient(135deg,#0d1117 0%,#0f2027 50%,#0d1117 100%);opacity:.8;"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;opacity:.06;">
+          <div style="font-size:120px;font-weight:900;color:white;">百人一首</div>
+        </div>
+
+        <!-- 歌未選択 -->
+        <div class="no-song" id="noSongMsg">
+          <div class="icon">🎴</div>
+          <p>左リストから歌をクリックすると<br>速度データがオーバーレイ表示されます</p>
+        </div>
+
+        <!-- オーバーレイカード -->
+        <div class="overlay-card" id="overlayCard">
+          <div class="song-title-row">
+            <div class="big-kimariji" id="bigKimariji">ちは</div>
+            <div class="song-meta">
+              <div class="diff-label">難易度</div>
+              <div class="diff-stars" id="diffStars"></div>
+              <div class="cv-label">変動係数: <span class="cv-value" id="cvValue"></span></div>
+            </div>
+          </div>
+
+          <div class="players-row">
+            <!-- maruyama1 -->
+            <div class="player-card maruyama" id="cardM">
+              <div class="player-name">MARUYAMA</div>
+              <div class="speed-row">
+                <div class="speed-value" id="speedM">—</div>
+                <div class="speed-unit">ms</div>
+              </div>
+              <div class="speed-label">平均反応速度</div>
+              <div class="bar-container">
+                <div class="bar-fill maruyama" id="barM" style="width:0%"></div>
+              </div>
+              <div class="player-stats">
+                <div class="stat-item">
+                  <div class="stat-label">自己ベスト</div>
+                  <div class="stat-val" id="bestM">—</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">SD</div>
+                  <div class="stat-val" id="sdM">—</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">試行数</div>
+                  <div class="stat-val" id="nM">—</div>
+                </div>
+              </div>
+              <div class="advantage-badge badge-faster" id="badgeM" style="display:none">⚡ 有利</div>
+            </div>
+
+            <!-- 差分 -->
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:60px;">
+              <div class="diff-indicator">
+                <div style="font-size:10px;color:#8b949e;margin-bottom:4px;">差</div>
+                <div class="diff-number" id="diffNum">—</div>
+                <div style="font-size:10px;color:#8b949e;margin-top:2px;">ms</div>
+              </div>
+            </div>
+
+            <!-- kurihara -->
+            <div class="player-card kurihara" id="cardK">
+              <div class="player-name">KURIHARA</div>
+              <div class="speed-row">
+                <div class="speed-value" id="speedK">—</div>
+                <div class="speed-unit">ms</div>
+              </div>
+              <div class="speed-label">平均反応速度</div>
+              <div class="bar-container">
+                <div class="bar-fill kurihara" id="barK" style="width:0%"></div>
+              </div>
+              <div class="player-stats">
+                <div class="stat-item">
+                  <div class="stat-label">自己ベスト</div>
+                  <div class="stat-val" id="bestK">—</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">SD</div>
+                  <div class="stat-val" id="sdK">—</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">試行数</div>
+                  <div class="stat-val" id="nK">—</div>
+                </div>
+              </div>
+              <div class="advantage-badge badge-faster" id="badgeK" style="display:none">⚡ 有利</div>
+            </div>
+          </div>
+
+          <!-- 実況コメント案 -->
+          <div class="commentary-box" id="commentaryBox">
+            <div class="commentary-title">💬 実況コメント案</div>
+            <div class="commentary-text" id="commentaryText">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- グラフビュー -->
+      <div class="chart-view" id="chartView">
+        <div class="chart-title">全100首 反応速度比較（平均 t_prime）</div>
+        <div style="display:flex;gap:16px;margin-bottom:12px;font-size:11px;">
+          <span style="color:#58a6ff;">■ maruyama1</span>
+          <span style="color:#3fb950;">■ kurihara-pilot1</span>
+          <span style="color:#8b949e;">※ バーの長さ = 遅さ（右が遅い）</span>
+        </div>
+        <div id="chartRows"></div>
+      </div>
+
+      <!-- プロファイルビュー -->
+      <div class="profile-view" id="profileView">
+        <div class="profile-grid">
+          <div class="profile-card m">
+            <div class="profile-card-title">maruyama1 プロファイル</div>
+            <div class="profile-stat-row"><span class="profile-stat-label">全体平均</span><span class="profile-stat-val" style="color:#58a6ff">1,253 ms</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">中央値</span><span class="profile-stat-val">1,239 ms</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">SD</span><span class="profile-stat-val">302 ms</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">rep1→rep6 改善</span><span class="profile-stat-val">−107 ms</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">自己ベスト</span><span class="profile-stat-val" style="color:#f0b429">275.8 ms（ちは）</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">rep1バイアス</span><span class="profile-stat-val">8.6 ms（小）</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">学習タイプ</span><span class="profile-stat-val">初回から安定型</span></div>
+          </div>
+          <div class="profile-card k">
+            <div class="profile-card-title">kurihara-pilot1 プロファイル</div>
+            <div class="profile-stat-row"><span class="profile-stat-label">全体平均</span><span class="profile-stat-val" style="color:#3fb950">1,581 ms</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">中央値</span><span class="profile-stat-val">1,586 ms</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">SD</span><span class="profile-stat-val">235 ms</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">rep1→rep6 改善</span><span class="profile-stat-val">−108 ms</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">自己ベスト</span><span class="profile-stat-val" style="color:#f0b429">485.5 ms（ちは）</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">rep1バイアス</span><span class="profile-stat-val">38.8 ms（大）</span></div>
+            <div class="profile-stat-row"><span class="profile-stat-label">学習タイプ</span><span class="profile-stat-val">試合が進む型</span></div>
+          </div>
+        </div>
+        <div class="commentary-box" style="margin-top:16px;">
+          <div class="commentary-title">📌 実況解説のポイント</div>
+          <div class="commentary-text">
+            <span class="commentary-highlight">速さの差: 約328ms</span>（maruyamaが有利）<br>
+            ただし<span class="commentary-highlight">歌によって差が縮まる</span>曲もあります（例: きみがためお、わたのはらや）。<br>
+            kurihara選手は<span class="commentary-highlight">試合後半に強い</span>タイプ。初戦より3〜4試合目が本来の実力です。<br>
+            <br>
+            2選手の歌ごと相関: <span class="commentary-highlight">r = 0.881</span> ── 難しい歌・簡単な歌の傾向は共通しています。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const SONGS = {
+  1: {kimariji:"あきの",n_chars:3,onset_ms:594,cv:42.7,mean_all:524,difficulty:4,maruyama1:{mean:332,sd:84,best:219,n:6},kurihara:{mean:716,sd:120,best:555,n:6}},
+  2: {kimariji:"はるす",n_chars:3,onset_ms:858,cv:55.0,mean_all:368,difficulty:1,maruyama1:{mean:206,sd:63,best:142,n:6},kurihara:{mean:529,sd:136,best:371,n:5}},
+  3: {kimariji:"あし",n_chars:2,onset_ms:529,cv:58.2,mean_all:438,difficulty:2,maruyama1:{mean:209,sd:56,best:125,n:6},kurihara:{mean:666,sd:120,best:507,n:6}},
+  4: {kimariji:"たご",n_chars:2,onset_ms:489,cv:79.3,mean_all:450,difficulty:3,maruyama1:{mean:139,sd:26,best:100,n:6},kurihara:{mean:762,sd:217,best:433,n:6}},
+  5: {kimariji:"おく",n_chars:2,onset_ms:499,cv:63.4,mean_all:476,difficulty:3,maruyama1:{mean:199,sd:49,best:136,n:6},kurihara:{mean:754,sd:114,best:604,n:6}},
+  6: {kimariji:"かさ",n_chars:2,onset_ms:1000,cv:37.1,mean_all:519,difficulty:4,maruyama1:{mean:369,sd:151,best:222,n:6},kurihara:{mean:669,sd:70,best:592,n:6}},
+  7: {kimariji:"あまの",n_chars:3,onset_ms:289,cv:58.9,mean_all:623,difficulty:5,maruyama1:{mean:324,sd:64,best:256,n:6},kurihara:{mean:922,sd:278,best:557,n:6}},
+  8: {kimariji:"わがゐ",n_chars:3,onset_ms:958,cv:36.9,mean_all:449,difficulty:2,maruyama1:{mean:326,sd:53,best:248,n:6},kurihara:{mean:572,sd:145,best:405,n:6}},
+  9: {kimariji:"はなの",n_chars:3,onset_ms:1000,cv:31.4,mean_all:471,difficulty:3,maruyama1:{mean:377,sd:92,best:276,n:6},kurihara:{mean:565,sd:136,best:446,n:6}},
+  10: {kimariji:"これ",n_chars:2,onset_ms:888,cv:68.1,mean_all:410,difficulty:2,maruyama1:{mean:162,sd:58,best:95,n:6},kurihara:{mean:659,sd:142,best:456,n:6}},
+  11: {kimariji:"わたのはらや",n_chars:6,onset_ms:1000,cv:5.8,mean_all:923,difficulty:5,maruyama1:{mean:889,sd:56,best:809,n:6},kurihara:{mean:957,sd:20,best:936,n:6}},
+  12: {kimariji:"あまつ",n_chars:3,onset_ms:993,cv:49.0,mean_all:480,difficulty:3,maruyama1:{mean:299,sd:43,best:218,n:6},kurihara:{mean:661,sd:203,best:496,n:6}},
+  13: {kimariji:"つく",n_chars:2,onset_ms:1000,cv:131.4,mean_all:259,difficulty:1,maruyama1:{mean:-4,sd:70,best:-131,n:6},kurihara:{mean:522,sd:288,best:191,n:6}},
+  14: {kimariji:"みち",n_chars:2,onset_ms:768,cv:59.5,mean_all:388,difficulty:1,maruyama1:{mean:180,sd:42,best:118,n:6},kurihara:{mean:596,sd:106,best:485,n:6}},
+  15: {kimariji:"きみがためは",n_chars:6,onset_ms:1000,cv:6.2,mean_all:912,difficulty:5,maruyama1:{mean:905,sd:72,best:801,n:6},kurihara:{mean:919,sd:41,best:867,n:6}},
+  16: {kimariji:"たち",n_chars:2,onset_ms:374,cv:66.1,mean_all:389,difficulty:1,maruyama1:{mean:162,sd:39,best:114,n:6},kurihara:{mean:616,sd:142,best:368,n:6}},
+  17: {kimariji:"ちは",n_chars:2,onset_ms:55,cv:38.9,mean_all:435,difficulty:2,maruyama1:{mean:299,sd:87,best:221,n:6},kurihara:{mean:571,sd:105,best:430,n:6}},
+  18: {kimariji:"す",n_chars:1,onset_ms:1000,cv:90.2,mean_all:188,difficulty:1,maruyama1:{mean:43,sd:68,best:-71,n:6},kurihara:{mean:333,sd:91,best:197,n:6}},
+  19: {kimariji:"なにわが",n_chars:4,onset_ms:818,cv:40.1,mean_all:590,difficulty:5,maruyama1:{mean:368,sd:38,best:323,n:6},kurihara:{mean:813,sd:62,best:739,n:6}},
+  20: {kimariji:"わび",n_chars:2,onset_ms:713,cv:53.5,mean_all:534,difficulty:4,maruyama1:{mean:296,sd:20,best:257,n:6},kurihara:{mean:773,sd:206,best:573,n:6}},
+  21: {kimariji:"いまこ",n_chars:3,onset_ms:1000,cv:32.9,mean_all:515,difficulty:4,maruyama1:{mean:374,sd:101,best:257,n:6},kurihara:{mean:656,sd:71,best:563,n:6}},
+  22: {kimariji:"ふ",n_chars:1,onset_ms:1000,cv:79.3,mean_all:314,difficulty:1,maruyama1:{mean:95,sd:32,best:73,n:6},kurihara:{mean:534,sd:141,best:392,n:6}},
+  23: {kimariji:"つき",n_chars:2,onset_ms:1000,cv:121.0,mean_all:264,difficulty:1,maruyama1:{mean:9,sd:138,best:-137,n:6},kurihara:{mean:520,sd:222,best:353,n:6}},
+  24: {kimariji:"この",n_chars:2,onset_ms:903,cv:64.3,mean_all:410,difficulty:2,maruyama1:{mean:163,sd:21,best:137,n:6},kurihara:{mean:656,sd:78,best:535,n:6}},
+  25: {kimariji:"なにし",n_chars:3,onset_ms:843,cv:61.1,mean_all:611,difficulty:5,maruyama1:{mean:369,sd:79,best:261,n:6},kurihara:{mean:853,sd:401,best:585,n:6}},
+  26: {kimariji:"おぐ",n_chars:2,onset_ms:484,cv:55.0,mean_all:500,difficulty:4,maruyama1:{mean:254,sd:61,best:185,n:6},kurihara:{mean:746,sd:133,best:568,n:6}},
+  27: {kimariji:"みかの",n_chars:3,onset_ms:534,cv:51.1,mean_all:581,difficulty:5,maruyama1:{mean:357,sd:58,best:242,n:6},kurihara:{mean:805,sd:264,best:570,n:6}},
+  28: {kimariji:"やまざ",n_chars:3,onset_ms:988,cv:40.0,mean_all:442,difficulty:2,maruyama1:{mean:287,sd:48,best:223,n:6},kurihara:{mean:596,sd:95,best:467,n:6}},
+  29: {kimariji:"こころあ",n_chars:4,onset_ms:798,cv:22.6,mean_all:563,difficulty:4,maruyama1:{mean:460,sd:22,best:435,n:6},kurihara:{mean:666,sd:98,best:541,n:6}},
+  30: {kimariji:"ありあ",n_chars:3,onset_ms:1000,cv:55.1,mean_all:495,difficulty:4,maruyama1:{mean:299,sd:101,best:215,n:6},kurihara:{mean:691,sd:247,best:444,n:6}},
+  31: {kimariji:"あさぼらけあ",n_chars:6,onset_ms:1000,cv:19.6,mean_all:908,difficulty:5,maruyama1:{mean:882,sd:57,best:791,n:6},kurihara:{mean:934,sd:254,best:420,n:6}},
+  32: {kimariji:"やまが",n_chars:3,onset_ms:803,cv:37.3,mean_all:484,difficulty:3,maruyama1:{mean:339,sd:78,best:236,n:6},kurihara:{mean:629,sd:123,best:524,n:6}},
+  33: {kimariji:"ひさ",n_chars:2,onset_ms:1000,cv:68.5,mean_all:356,difficulty:1,maruyama1:{mean:153,sd:81,best:42,n:6},kurihara:{mean:558,sd:161,best:380,n:6}},
+  34: {kimariji:"たれ",n_chars:2,onset_ms:1000,cv:52.9,mean_all:474,difficulty:3,maruyama1:{mean:262,sd:69,best:165,n:6},kurihara:{mean:687,sd:158,best:540,n:6}},
+  35: {kimariji:"ひとは",n_chars:3,onset_ms:1000,cv:45.6,mean_all:462,difficulty:3,maruyama1:{mean:287,sd:78,best:187,n:6},kurihara:{mean:636,sd:136,best:517,n:6}},
+  36: {kimariji:"なつ",n_chars:2,onset_ms:843,cv:57.0,mean_all:452,difficulty:3,maruyama1:{mean:233,sd:36,best:178,n:6},kurihara:{mean:670,sd:171,best:527,n:6}},
+  37: {kimariji:"しら",n_chars:2,onset_ms:1000,cv:63.8,mean_all:402,difficulty:1,maruyama1:{mean:166,sd:58,best:58,n:6},kurihara:{mean:638,sd:87,best:525,n:6}},
+  38: {kimariji:"わすら",n_chars:3,onset_ms:683,cv:51.1,mean_all:512,difficulty:4,maruyama1:{mean:283,sd:42,best:216,n:6},kurihara:{mean:740,sd:152,best:651,n:6}},
+  39: {kimariji:"あさじ",n_chars:3,onset_ms:983,cv:22.6,mean_all:586,difficulty:5,maruyama1:{mean:463,sd:37,best:414,n:6},kurihara:{mean:709,sd:28,best:681,n:6}},
+  40: {kimariji:"しの",n_chars:2,onset_ms:1000,cv:67.6,mean_all:403,difficulty:1,maruyama1:{mean:239,sd:297,best:-64,n:6},kurihara:{mean:567,sd:102,best:425,n:6}},
+  41: {kimariji:"こい",n_chars:2,onset_ms:998,cv:43.8,mean_all:415,difficulty:2,maruyama1:{mean:251,sd:42,best:186,n:6},kurihara:{mean:579,sd:81,best:493,n:6}},
+  42: {kimariji:"ちぎりき",n_chars:4,onset_ms:868,cv:23.1,mean_all:575,difficulty:4,maruyama1:{mean:478,sd:65,best:396,n:6},kurihara:{mean:672,sd:110,best:538,n:6}},
+  43: {kimariji:"あい",n_chars:2,onset_ms:993,cv:68.9,mean_all:409,difficulty:2,maruyama1:{mean:153,sd:45,best:120,n:6},kurihara:{mean:665,sd:124,best:489,n:6}},
+  44: {kimariji:"おおこ",n_chars:3,onset_ms:883,cv:35.7,mean_all:447,difficulty:2,maruyama1:{mean:314,sd:53,best:235,n:6},kurihara:{mean:580,sd:103,best:450,n:6}},
+  45: {kimariji:"あはれ",n_chars:3,onset_ms:1000,cv:44.1,mean_all:493,difficulty:4,maruyama1:{mean:305,sd:56,best:232,n:6},kurihara:{mean:681,sd:125,best:518,n:6}},
+  46: {kimariji:"ゆら",n_chars:2,onset_ms:678,cv:54.0,mean_all:393,difficulty:1,maruyama1:{mean:194,sd:17,best:174,n:6},kurihara:{mean:592,sd:60,best:532,n:6}},
+  47: {kimariji:"やえ",n_chars:2,onset_ms:1000,cv:45.2,mean_all:475,difficulty:3,maruyama1:{mean:316,sd:102,best:224,n:6},kurihara:{mean:634,sd:174,best:433,n:6}},
+  48: {kimariji:"かぜを",n_chars:3,onset_ms:953,cv:37.8,mean_all:450,difficulty:3,maruyama1:{mean:312,sd:58,best:245,n:6},kurihara:{mean:588,sd:121,best:465,n:6}},
+  49: {kimariji:"みかき",n_chars:3,onset_ms:1000,cv:53.1,mean_all:438,difficulty:2,maruyama1:{mean:242,sd:63,best:176,n:6},kurihara:{mean:633,sd:152,best:409,n:6}},
+  50: {kimariji:"きみがためお",n_chars:6,onset_ms:1000,cv:11.6,mean_all:896,difficulty:5,maruyama1:{mean:947,sd:51,best:871,n:6},kurihara:{mean:846,sd:123,best:608,n:6}},
+  51: {kimariji:"かく",n_chars:2,onset_ms:1000,cv:48.7,mean_all:445,difficulty:2,maruyama1:{mean:241,sd:37,best:190,n:6},kurihara:{mean:649,sd:43,best:564,n:6}},
+  52: {kimariji:"あけ",n_chars:2,onset_ms:1000,cv:41.2,mean_all:476,difficulty:3,maruyama1:{mean:292,sd:43,best:247,n:6},kurihara:{mean:661,sd:37,best:605,n:6}},
+  53: {kimariji:"なげき",n_chars:3,onset_ms:1000,cv:33.3,mean_all:517,difficulty:4,maruyama1:{mean:364,sd:36,best:306,n:6},kurihara:{mean:670,sd:87,best:520,n:6}},
+  54: {kimariji:"わすれ",n_chars:3,onset_ms:1000,cv:35.3,mean_all:570,difficulty:4,maruyama1:{mean:441,sd:183,best:233,n:6},kurihara:{mean:698,sd:125,best:461,n:6}},
+  55: {kimariji:"たき",n_chars:2,onset_ms:1000,cv:63.9,mean_all:432,difficulty:2,maruyama1:{mean:175,sd:36,best:115,n:6},kurihara:{mean:690,sd:90,best:541,n:6}},
+  56: {kimariji:"あらざ",n_chars:3,onset_ms:998,cv:39.2,mean_all:490,difficulty:3,maruyama1:{mean:318,sd:15,best:300,n:6},kurihara:{mean:663,sd:100,best:515,n:6}},
+  57: {kimariji:"め",n_chars:1,onset_ms:893,cv:68.9,mean_all:426,difficulty:2,maruyama1:{mean:171,sd:26,best:142,n:6},kurihara:{mean:681,sd:180,best:515,n:6}},
+  58: {kimariji:"ありま",n_chars:3,onset_ms:1000,cv:40.1,mean_all:514,difficulty:4,maruyama1:{mean:330,sd:78,best:263,n:6},kurihara:{mean:697,sd:77,best:624,n:6}},
+  59: {kimariji:"やす",n_chars:2,onset_ms:1000,cv:56.7,mean_all:534,difficulty:4,maruyama1:{mean:313,sd:236,best:124,n:6},kurihara:{mean:754,sd:171,best:554,n:6}},
+  60: {kimariji:"おおえ",n_chars:3,onset_ms:923,cv:32.4,mean_all:472,difficulty:3,maruyama1:{mean:340,sd:49,best:265,n:6},kurihara:{mean:603,sd:85,best:491,n:6}},
+  61: {kimariji:"いに",n_chars:2,onset_ms:1000,cv:33.9,mean_all:566,difficulty:4,maruyama1:{mean:450,sd:73,best:317,n:6},kurihara:{mean:683,sd:208,best:519,n:6}},
+  62: {kimariji:"よを",n_chars:2,onset_ms:1000,cv:49.8,mean_all:467,difficulty:3,maruyama1:{mean:273,sd:33,best:224,n:6},kurihara:{mean:661,sd:167,best:457,n:6}},
+  63: {kimariji:"いまは",n_chars:3,onset_ms:1000,cv:30.9,mean_all:578,difficulty:5,maruyama1:{mean:486,sd:183,best:208,n:6},kurihara:{mean:671,sd:127,best:546,n:6}},
+  64: {kimariji:"あさぼらけう",n_chars:6,onset_ms:958,cv:7.9,mean_all:1008,difficulty:5,maruyama1:{mean:946,sd:60,best:841,n:6},kurihara:{mean:1069,sd:38,best:1026,n:6}},
+  65: {kimariji:"うら",n_chars:2,onset_ms:1000,cv:45.7,mean_all:476,difficulty:3,maruyama1:{mean:283,sd:40,best:232,n:6},kurihara:{mean:668,sd:117,best:508,n:6}},
+  66: {kimariji:"もろ",n_chars:2,onset_ms:1000,cv:56.6,mean_all:407,difficulty:1,maruyama1:{mean:192,sd:41,best:135,n:6},kurihara:{mean:622,sd:64,best:543,n:6}},
+  67: {kimariji:"はるの",n_chars:3,onset_ms:1000,cv:45.5,mean_all:474,difficulty:3,maruyama1:{mean:298,sd:78,best:213,n:6},kurihara:{mean:651,sd:147,best:475,n:6}},
+  68: {kimariji:"こころに",n_chars:4,onset_ms:1000,cv:49.7,mean_all:622,difficulty:5,maruyama1:{mean:465,sd:69,best:356,n:6},kurihara:{mean:778,sd:383,best:544,n:6}},
+  69: {kimariji:"あらし",n_chars:3,onset_ms:908,cv:42.6,mean_all:474,difficulty:3,maruyama1:{mean:301,sd:64,best:181,n:6},kurihara:{mean:647,sd:116,best:515,n:6}},
+  70: {kimariji:"さ",n_chars:1,onset_ms:1000,cv:64.2,mean_all:390,difficulty:1,maruyama1:{mean:168,sd:70,best:28,n:6},kurihara:{mean:613,sd:120,best:524,n:6}},
+  71: {kimariji:"ゆう",n_chars:2,onset_ms:1000,cv:51.7,mean_all:429,difficulty:2,maruyama1:{mean:226,sd:35,best:191,n:6},kurihara:{mean:632,sd:91,best:513,n:6}},
+  72: {kimariji:"おと",n_chars:2,onset_ms:1000,cv:45.2,mean_all:368,difficulty:1,maruyama1:{mean:222,sd:31,best:169,n:6},kurihara:{mean:513,sd:94,best:398,n:6}},
+  73: {kimariji:"たか",n_chars:2,onset_ms:1000,cv:50.7,mean_all:418,difficulty:2,maruyama1:{mean:227,sd:59,best:114,n:6},kurihara:{mean:609,sd:89,best:495,n:6}},
+  74: {kimariji:"うか",n_chars:2,onset_ms:1000,cv:61.9,mean_all:373,difficulty:1,maruyama1:{mean:188,sd:36,best:144,n:6},kurihara:{mean:558,sd:184,best:355,n:6}},
+  75: {kimariji:"ちぎりお",n_chars:4,onset_ms:1000,cv:31.2,mean_all:626,difficulty:5,maruyama1:{mean:558,sd:124,best:440,n:6},kurihara:{mean:694,sd:240,best:483,n:6}},
+  76: {kimariji:"わたのはらこ",n_chars:6,onset_ms:1000,cv:9.7,mean_all:952,difficulty:5,maruyama1:{mean:901,sd:36,best:856,n:6},kurihara:{mean:1002,sd:107,best:891,n:6}},
+  77: {kimariji:"せ",n_chars:1,onset_ms:1000,cv:62.6,mean_all:355,difficulty:1,maruyama1:{mean:158,sd:71,best:74,n:6},kurihara:{mean:552,sd:102,best:468,n:6}},
+  78: {kimariji:"あはじ",n_chars:3,onset_ms:1000,cv:37.7,mean_all:469,difficulty:3,maruyama1:{mean:315,sd:70,best:237,n:6},kurihara:{mean:623,sd:85,best:508,n:6}},
+  79: {kimariji:"あきか",n_chars:3,onset_ms:1000,cv:47.3,mean_all:462,difficulty:3,maruyama1:{mean:280,sd:62,best:190,n:6},kurihara:{mean:644,sd:146,best:443,n:6}},
+  80: {kimariji:"ながか",n_chars:3,onset_ms:1000,cv:27.6,mean_all:530,difficulty:4,maruyama1:{mean:403,sd:45,best:355,n:6},kurihara:{mean:657,sd:80,best:565,n:6}},
+  81: {kimariji:"ほ",n_chars:1,onset_ms:1000,cv:53.5,mean_all:362,difficulty:1,maruyama1:{mean:233,sd:124,best:124,n:6},kurihara:{mean:490,sd:166,best:373,n:6}},
+  82: {kimariji:"おも",n_chars:2,onset_ms:1000,cv:52.6,mean_all:358,difficulty:1,maruyama1:{mean:227,sd:120,best:91,n:6},kurihara:{mean:488,sd:150,best:233,n:6}},
+  83: {kimariji:"よのなかよ",n_chars:5,onset_ms:1000,cv:18.8,mean_all:693,difficulty:5,maruyama1:{mean:680,sd:61,best:612,n:6},kurihara:{mean:706,sd:182,best:419,n:6}},
+  84: {kimariji:"ながら",n_chars:3,onset_ms:1000,cv:36.7,mean_all:516,difficulty:4,maruyama1:{mean:360,sd:49,best:291,n:6},kurihara:{mean:672,sd:133,best:534,n:6}},
+  85: {kimariji:"よも",n_chars:2,onset_ms:1000,cv:40.0,mean_all:512,difficulty:4,maruyama1:{mean:358,sd:143,best:196,n:6},kurihara:{mean:666,sd:121,best:567,n:6}},
+  86: {kimariji:"なげけ",n_chars:3,onset_ms:1000,cv:30.5,mean_all:565,difficulty:4,maruyama1:{mean:414,sd:40,best:360,n:6},kurihara:{mean:716,sd:95,best:599,n:6}},
+  87: {kimariji:"む",n_chars:1,onset_ms:1000,cv:54.3,mean_all:362,difficulty:1,maruyama1:{mean:184,sd:34,best:130,n:6},kurihara:{mean:539,sd:88,best:473,n:6}},
+  88: {kimariji:"なにわえ",n_chars:4,onset_ms:1000,cv:35.9,mean_all:606,difficulty:5,maruyama1:{mean:437,sd:25,best:401,n:6},kurihara:{mean:776,sd:186,best:600,n:6}},
+  89: {kimariji:"たま",n_chars:2,onset_ms:1000,cv:63.7,mean_all:402,difficulty:1,maruyama1:{mean:175,sd:52,best:127,n:6},kurihara:{mean:628,sd:133,best:490,n:6}},
+  90: {kimariji:"みせ",n_chars:2,onset_ms:1000,cv:52.3,mean_all:453,difficulty:3,maruyama1:{mean:237,sd:45,best:208,n:6},kurihara:{mean:669,sd:99,best:565,n:6}},
+  91: {kimariji:"きり",n_chars:2,onset_ms:1000,cv:29.4,mean_all:422,difficulty:2,maruyama1:{mean:331,sd:56,best:254,n:6},kurihara:{mean:512,sd:105,best:394,n:6}},
+  92: {kimariji:"わがそ",n_chars:3,onset_ms:1000,cv:34.7,mean_all:438,difficulty:2,maruyama1:{mean:308,sd:56,best:211,n:6},kurihara:{mean:569,sd:82,best:460,n:6}},
+  93: {kimariji:"よのなかは",n_chars:5,onset_ms:1000,cv:23.9,mean_all:684,difficulty:5,maruyama1:{mean:670,sd:25,best:638,n:6},kurihara:{mean:699,sd:240,best:341,n:6}},
+  94: {kimariji:"みよ",n_chars:2,onset_ms:1000,cv:60.2,mean_all:618,difficulty:5,maruyama1:{mean:513,sd:514,best:136,n:6},kurihara:{mean:722,sd:117,best:592,n:6}},
+  95: {kimariji:"おおけ",n_chars:3,onset_ms:1000,cv:26.7,mean_all:432,difficulty:2,maruyama1:{mean:345,sd:68,best:218,n:6},kurihara:{mean:519,sd:80,best:386,n:6}},
+  96: {kimariji:"はなさ",n_chars:3,onset_ms:1000,cv:36.0,mean_all:494,difficulty:4,maruyama1:{mean:353,sd:113,best:202,n:6},kurihara:{mean:634,sd:96,best:486,n:6}},
+  97: {kimariji:"こぬ",n_chars:2,onset_ms:1000,cv:53.8,mean_all:414,difficulty:2,maruyama1:{mean:221,sd:21,best:194,n:6},kurihara:{mean:607,sd:139,best:489,n:6}},
+  98: {kimariji:"かぜそ",n_chars:3,onset_ms:1000,cv:36.5,mean_all:671,difficulty:5,maruyama1:{mean:685,sd:357,best:170,n:6},kurihara:{mean:657,sd:62,best:575,n:6}},
+  99: {kimariji:"ひとも",n_chars:3,onset_ms:1000,cv:64.1,mean_all:640,difficulty:5,maruyama1:{mean:729,sd:576,best:162,n:6},kurihara:{mean:552,sd:141,best:355,n:6}},
+  100: {kimariji:"もも",n_chars:2,onset_ms:1000,cv:47.8,mean_all:427,difficulty:2,maruyama1:{mean:242,sd:66,best:201,n:6},kurihara:{mean:612,sd:71,best:487,n:6}},
+};
+
+let currentSong = null;
+const MAX_MS = 1200;
+
+function stars(d) {
+  return '★'.repeat(d) + '☆'.repeat(5-d);
+}
+
+function buildSongList() {
+  const container = document.getElementById('songList');
+  const sorted = Object.entries(SONGS).sort((a,b) => a[1].mean_all - b[1].mean_all);
+  sorted.forEach(([id, s]) => {
+    const mBar = s.maruyama1 ? s.maruyama1.mean / MAX_MS * 60 : 0;
+    const kBar = s.kurihara  ? s.kurihara.mean  / MAX_MS * 60 : 0;
+    const div = document.createElement('div');
+    div.className = 'song-item';
+    div.dataset.id = id;
+    div.dataset.km = s.kimariji;
+    div.innerHTML = `
+      <div class="song-kimariji">${s.kimariji}</div>
+      <div class="song-diff">${stars(s.difficulty).split('').map(c => `<span class="star${c==='☆'?' empty':''}">${c}</span>`).join('')}</div>
+      <div class="song-bars">
+        <div class="mini-bar-wrap">
+          <div class="mini-bar bar-m" style="width:${mBar}px"></div>
+          <div class="mini-bar bar-k" style="width:${kBar}px"></div>
+        </div>
+        <div style="font-size:10px;color:#8b949e;min-width:38px;text-align:right">${s.mean_all}ms</div>
+      </div>
+    `;
+    div.onclick = () => selectSong(id);
+    container.appendChild(div);
+  });
+}
+
+function filterSongs() {
+  const q = document.getElementById('searchBox').value.trim();
+  document.querySelectorAll('.song-item').forEach(el => {
+    el.style.display = (!q || el.dataset.km.includes(q)) ? '' : 'none';
+  });
+}
+
+function selectSong(id) {
+  currentSong = id;
+  document.querySelectorAll('.song-item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+  document.querySelectorAll('.chart-row').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+  updateOverlay(id);
+}
+
+function updateOverlay(id) {
+  const s = SONGS[id];
+  document.getElementById('noSongMsg').style.display = 'none';
+  const card = document.getElementById('overlayCard');
+  card.classList.add('visible');
+
+  document.getElementById('bigKimariji').textContent = s.kimariji;
+  document.getElementById('diffStars').textContent = stars(s.difficulty);
+  document.getElementById('cvValue').textContent = s.cv + '%';
+
+  const m = s.maruyama1, k = s.kurihara;
+  const faster = (m && k) ? (m.mean < k.mean ? 'maruyama' : 'kurihara') : null;
+
+  // maruyama
+  document.getElementById('speedM').textContent = m ? m.mean : '—';
+  document.getElementById('bestM').textContent  = m ? m.best+'ms' : '—';
+  document.getElementById('sdM').textContent    = m ? '±'+m.sd+'ms' : '—';
+  document.getElementById('nM').textContent     = m ? m.n+'回' : '—';
+  document.getElementById('barM').style.width   = m ? (m.mean/MAX_MS*100)+'%' : '0%';
+  document.getElementById('badgeM').style.display = (faster==='maruyama') ? '' : 'none';
+
+  // kurihara
+  document.getElementById('speedK').textContent = k ? k.mean : '—';
+  document.getElementById('bestK').textContent  = k ? k.best+'ms' : '—';
+  document.getElementById('sdK').textContent    = k ? '±'+k.sd+'ms' : '—';
+  document.getElementById('nK').textContent     = k ? k.n+'回' : '—';
+  document.getElementById('barK').style.width   = k ? (k.mean/MAX_MS*100)+'%' : '0%';
+  document.getElementById('badgeK').style.display = (faster==='kurihara') ? '' : 'none';
+
+  // 差分
+  if (m && k) {
+    const diff = Math.abs(m.mean - k.mean);
+    document.getElementById('diffNum').textContent = diff;
+  }
+
+  // 実況コメント
+  document.getElementById('commentaryText').innerHTML = generateCommentary(s, id);
+}
+
+function generateCommentary(s, id) {
+  const m = s.maruyama1, k = s.kurihara;
+  const km = s.kimariji;
+  const diffStr = s.difficulty >= 4 ? '難しい' : s.difficulty <= 2 ? '比較的速い' : '中程度の';
+  const cvStr = s.cv > 25 ? '反応にばらつきが大きい' : s.cv < 8 ? 'どの選手も安定して同じ速度になる' : '安定した';
+
+  let text = `<b>「${km}」</b>は${diffStr}歌。${cvStr}傾向があります（CV=${s.cv}%）。<br>`;
+
+  if (m && k) {
+    const faster = m.mean < k.mean ? 'maruyama1' : 'kurihara-pilot1';
+    const slower = faster === 'maruyama1' ? 'kurihara-pilot1' : 'maruyama1';
+    const diff = Math.abs(m.mean - k.mean);
+    const fasterData = faster === 'maruyama1' ? m : k;
+    text += `<span class="commentary-highlight">${faster}</span> が平均 <span class="commentary-highlight">${diff}ms</span> リード。`;
+    text += `${faster} の自己ベストは ${fasterData.best}ms です。`;
+    if (diff < 50) text += ' <b>ほぼ互角のこの歌、勝負の行方は！</b>';
+    else if (diff > 200) text += ` <b>${faster} が大きくリードしているこの歌！</b>`;
+  }
+  return text;
+}
+
+function buildChart() {
+  const container = document.getElementById('chartRows');
+  const sorted = Object.entries(SONGS).sort((a,b) => a[1].mean_all - b[1].mean_all);
+  const maxMs = 1200;
+  sorted.forEach(([id, s]) => {
+    const mW = s.maruyama1 ? (s.maruyama1.mean / maxMs * 300) : 0;
+    const kW = s.kurihara  ? (s.kurihara.mean  / maxMs * 300) : 0;
+    const row = document.createElement('div');
+    row.className = 'chart-row';
+    row.dataset.id = id;
+    row.innerHTML = `
+      <div class="chart-km">${s.kimariji}</div>
+      <div class="chart-bar-area">
+        <div class="chart-bar-row">
+          <div class="chart-bar m" style="width:${mW}px"></div>
+          <div class="chart-val">${s.maruyama1 ? s.maruyama1.mean+'ms' : '—'}</div>
+        </div>
+        <div class="chart-bar-row">
+          <div class="chart-bar k" style="width:${kW}px"></div>
+          <div class="chart-val">${s.kurihara ? s.kurihara.mean+'ms' : '—'}</div>
+        </div>
+      </div>
+    `;
+    row.onclick = () => selectSong(id);
+    container.appendChild(row);
+  });
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['overlay','chart','profile'][i] === tab);
+  });
+  document.getElementById('overlayView').style.display  = tab==='overlay' ? 'flex' : 'none';
+  document.getElementById('overlayView').style.flexDirection = 'column';
+  document.getElementById('chartView').classList.toggle('visible', tab==='chart');
+  document.getElementById('profileView').classList.toggle('visible', tab==='profile');
+  // overlayViewはposition:relativeの親なので表示切替
+  document.getElementById('overlayView').style.display = tab==='overlay' ? '' : 'none';
+}
+
+// 初期化
+buildSongList();
+buildChart();
+</script>
+</body>
+</html>

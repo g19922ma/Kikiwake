@@ -4,7 +4,7 @@
 
 const CONFIG = {
   motorTrials: 30,
-  mainRepetitions: 6,
+  mainRepetitions: 3,
   totalCategories: 100,
   breakInterval: 10,
   cueSoundPlaybackDuration: 2.8,
